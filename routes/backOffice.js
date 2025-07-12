@@ -5,6 +5,11 @@ const fs = require('fs');
 const router = express.Router();
 const Deal = require('../models/Deal');
 const DocumentType = require('../models/DocumentType');
+const { authenticateToken, requireBackOfficeAccess } = require('../middleware/auth');
+
+// Apply authentication and back office access middleware to all routes
+router.use(authenticateToken);
+router.use(requireBackOfficeAccess);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads/documents');

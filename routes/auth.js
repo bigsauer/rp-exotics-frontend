@@ -132,8 +132,8 @@ router.get('/check-session', authenticateToken, (req, res) => {
     // Define permissions based on role
     const permissions = {
       sales: ['view_deals', 'create_deals', 'edit_deals'],
-      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports'],
-      finance: ['view_deals', 'view_reports', 'manage_finances']
+      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports', 'back_office_access', 'manage_dealers', 'manage_documents', 'workflow_management'],
+      finance: ['view_deals', 'view_reports', 'manage_finances', 'back_office_access', 'manage_documents', 'workflow_management', 'compliance_management']
     };
 
     res.json({
@@ -176,8 +176,8 @@ router.get('/profile', authenticateToken, (req, res) => {
     // Define permissions based on role
     const permissions = {
       sales: ['view_deals', 'create_deals', 'edit_deals'],
-      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports'],
-      finance: ['view_deals', 'view_reports', 'manage_finances']
+      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports', 'back_office_access', 'manage_dealers', 'manage_documents', 'workflow_management'],
+      finance: ['view_deals', 'view_reports', 'manage_finances', 'back_office_access', 'manage_documents', 'workflow_management', 'compliance_management']
     };
 
     res.json({
