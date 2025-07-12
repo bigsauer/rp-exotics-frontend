@@ -1,9 +1,144 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const router = express.Router();
 
-// Placeholder auth route
-router.get('/test', (req, res) => {
-  res.json({ message: 'Auth routes working!' });
+// Team member credentials (in production, these would be in a database)
+const TEAM_MEMBERS = {
+  'parker@rpexotics.com': { password: '1234', role: 'sales', displayName: 'Parker' },
+  'brennan@rpexotics.com': { password: '1026', role: 'sales', displayName: 'Brennan' },
+  'dan@rpexotics.com': { password: 'Ilikemen', role: 'sales', displayName: 'Dan' },
+  'adiana@rpexotics.com': { password: 'PalicARP', role: 'sales', displayName: 'Adiana' },
+  'brett@rpexotics.com': { password: 'coop123!', role: 'sales', displayName: 'Brett' },
+  'chris@rpexotics.com': { password: 'Matti11!', role: 'admin', displayName: 'Chris' },
+  'tammie@rpexotics.com': { password: 'Twood1125!', role: 'admin', displayName: 'Tammie' },
+  'lynn@rpexotics.com': { password: 'titles123', role: 'finance', displayName: 'Lynn' }
+};
+
+// JWT secret (in production, use environment variable)
+const JWT_SECRET = process.env.JWT_SECRET || 'rp-exotics-secret-key';
+
+// Middleware to verify JWT token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Login endpoint
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // Check if user exists
+    const user = TEAM_MEMBERS[email];
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check password (in production, use bcrypt.compare)
+    if (password !== user.password) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Create user profile
+    const profile = {
+      displayName: user.displayName,
+      email: email,
+      role: user.role,
+      department: user.role === 'admin' ? 'Administration' : 
+                  user.role === 'finance' ? 'Finance' : 'Sales'
+    };
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        email: email, 
+        role: user.role,
+        displayName: user.displayName 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      success: true,
+      token: token,
+      user: {
+        profile: profile,
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout endpoint
+router.post('/logout', authenticateToken, (req, res) => {
+  // In a real app, you might blacklist the token
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// Get user profile
+router.get('/profile', authenticateToken, (req, res) => {
+  try {
+    const user = TEAM_MEMBERS[req.user.email];
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const profile = {
+      displayName: user.displayName,
+      email: req.user.email,
+      role: user.role,
+      department: user.role === 'admin' ? 'Administration' : 
+                  user.role === 'finance' ? 'Finance' : 'Sales'
+    };
+
+    // Define permissions based on role
+    const permissions = {
+      sales: ['view_deals', 'create_deals', 'edit_deals'],
+      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports'],
+      finance: ['view_deals', 'view_reports', 'manage_finances']
+    };
+
+    res.json({
+      success: true,
+      profile: profile,
+      permissions: permissions[user.role] || []
+    });
+
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Authentication service is running',
+    timestamp: new Date().toISOString()
+  });
 });
 
 module.exports = router; 

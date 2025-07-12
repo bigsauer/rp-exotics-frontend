@@ -10,7 +10,18 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rp_exotics_super_secret_key_2025_change_this_in_production';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://rp-exotics-frontend.vercel.app',
+    'https://rp-exotics-frontend.netlify.app'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Authentication middleware
@@ -289,6 +300,16 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Get current user profile
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    // req.user already contains the full user object from middleware
+    res.json(req.user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current user (alias for /api/auth/profile)
+app.get('/api/users/me', authenticateToken, async (req, res) => {
   try {
     // req.user already contains the full user object from middleware
     res.json(req.user);
@@ -634,6 +655,47 @@ app.get('/api/deals/search', async (req, res) => {
     
     res.json(deals);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Search dealers
+app.get('/api/dealers/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.length < 2) {
+      return res.json({ dealers: [] });
+    }
+    
+    const dealers = await db.collection('dealers')
+      .find({
+        $or: [
+          { name: { $regex: q, $options: 'i' } },
+          { 'contact.person': { $regex: q, $options: 'i' } },
+          { 'contact.email': { $regex: q, $options: 'i' } },
+          { 'contact.phone': { $regex: q, $options: 'i' } }
+        ]
+      })
+      .limit(10)
+      .sort({ name: 1 })
+      .toArray();
+    
+    // Transform dealers to match frontend expectations
+    const transformedDealers = dealers.map(dealer => ({
+      id: dealer._id.toString(),
+      name: dealer.name,
+      company: dealer.name, // Use name as company for now
+      location: dealer.location?.city && dealer.location?.state 
+        ? `${dealer.location.city}, ${dealer.location.state}`
+        : dealer.location?.city || dealer.location?.state || '',
+      phone: dealer.contact?.phone || '',
+      email: dealer.contact?.email || ''
+    }));
+    
+    res.json({ dealers: transformedDealers });
+  } catch (error) {
+    console.error('Dealer search error:', error);
     res.status(500).json({ error: error.message });
   }
 });

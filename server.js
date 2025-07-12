@@ -34,21 +34,51 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
+// Connect to MongoDB with better error handling
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/rp-exotics';
-mongoose.connect(mongoUri)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+console.log('🔗 Attempting to connect to MongoDB...');
+console.log('📍 Connection string:', mongoUri.includes('mongodb+srv') ? 'MongoDB Atlas (Cloud)' : 'Local MongoDB');
+
+mongoose.connect(mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+})
+.then(() => {
+  console.log('✅ MongoDB connected successfully');
+  console.log('📊 Database:', mongoose.connection.name);
+})
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  console.log('\n🔧 To fix this issue:');
+  console.log('1. For local development: Install MongoDB locally');
+  console.log('   - macOS: brew install mongodb-community');
+  console.log('   - Then run: brew services start mongodb-community');
+  console.log('');
+  console.log('2. For cloud development: Set up MongoDB Atlas');
+  console.log('   - Create a free account at https://mongodb.com/atlas');
+  console.log('   - Create a cluster and get your connection string');
+  console.log('   - Add MONGODB_URI to your .env file');
+  console.log('');
+  console.log('3. For Railway deployment: Set MONGODB_URI in Railway dashboard');
+  console.log('');
+  console.log('⚠️  Server will continue running but database operations will fail');
+});
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/dealers', require('./routes/dealers'));  // Dealer management
 app.use('/api', require('./routes/deals'));  // This includes VIN decode and dealer search
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
   res.json({
     status: 'OK',
     message: 'RP Exotics Backend is running',
+    database: dbStatus,
     timestamp: new Date().toISOString()
   });
 });
