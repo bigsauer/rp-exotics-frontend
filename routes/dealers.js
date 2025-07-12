@@ -2,6 +2,41 @@ const express = require('express');
 const router = express.Router();
 const Dealer = require('../models/Dealer');
 
+// GET /api/dealers/search - Search dealers for autocomplete (MUST BE BEFORE /:id route)
+router.get('/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim() === '') {
+      return res.json({ dealers: [] });
+    }
+
+    // Search by name, company, or contact info
+    const dealers = await Dealer.find({
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { company: { $regex: q, $options: 'i' } },
+        { 'contact.email': { $regex: q, $options: 'i' } },
+        { 'contact.phone': { $regex: q, $options: 'i' } }
+      ]
+    }).limit(10).sort({ name: 1 });
+
+    // Transform dealers to match frontend expectations
+    const transformedDealers = dealers.map(dealer => ({
+      id: dealer._id.toString(),
+      name: dealer.name,
+      company: dealer.company || dealer.name,
+      location: dealer.contact?.location || '',
+      phone: dealer.contact?.phone || '',
+      email: dealer.contact?.email || ''
+    }));
+
+    res.json({ dealers: transformedDealers });
+  } catch (error) {
+    console.error('Error searching dealers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/dealers - Get all dealers with filtering, sorting, and pagination
 router.get('/', async (req, res) => {
   try {
@@ -120,41 +155,6 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting dealers:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/dealers/search - Search dealers for autocomplete
-router.get('/search', async (req, res) => {
-  try {
-    const { q } = req.query;
-    if (!q || q.trim() === '') {
-      return res.json({ dealers: [] });
-    }
-
-    // Search by name, company, or contact info
-    const dealers = await Dealer.find({
-      $or: [
-        { name: { $regex: q, $options: 'i' } },
-        { company: { $regex: q, $options: 'i' } },
-        { 'contact.email': { $regex: q, $options: 'i' } },
-        { 'contact.phone': { $regex: q, $options: 'i' } }
-      ]
-    }).limit(10).sort({ name: 1 });
-
-    // Transform dealers to match frontend expectations
-    const transformedDealers = dealers.map(dealer => ({
-      id: dealer._id.toString(),
-      name: dealer.name,
-      company: dealer.company || dealer.name,
-      location: dealer.contact?.location || '',
-      phone: dealer.contact?.phone || '',
-      email: dealer.contact?.email || ''
-    }));
-
-    res.json({ dealers: transformedDealers });
-  } catch (error) {
-    console.error('Error searching dealers:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
