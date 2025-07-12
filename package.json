@@ -1,0 +1,33 @@
+{
+  "name": "rp-exotics-backend",
+  "version": "1.0.0",
+  "description": "RP Exotics API Server",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "node test-auth.js",
+    "setup": "node setup.js",
+    "test:auth": "node test-auth.js",
+    "users:create": "node userSetup.js create",
+    "users:verify": "node userSetup.js verify",
+    "users:reset": "node userSetup.js reset",
+    "users:test": "node userSetup.js test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.17.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
