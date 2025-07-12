@@ -1,286 +1,527 @@
 const axios = require('axios');
 
-// Dealer data from the user
+// Your dealer data
 const dealers = [
   {
-    name: "McLaren NJ / Suburban Exotics",
-    contact: "Anthony Rumeo",
-    phone: "",
-    email: "Anthony@squadrav.com"
+    "name": "Anthony Rumeo",
+    "company": "McLaren NJ / Suburban Exotics",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "Anthony@squadrav.com",
+      "location": "New Jersey"
+    }
   },
   {
-    name: "West Coast Exotics",
-    contact: "Eric Currion",
-    phone: "",
-    email: ""
+    "name": "Eric Currion",
+    "company": "West Coast Exotics",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "West Coast"
+    }
   },
   {
-    name: "Left Lane Exotics",
-    contact: "Joe Humphrey",
-    phone: "",
-    email: ""
+    "name": "Joe Humphrey",
+    "company": "Left Lane Exotics",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "GMTV",
-    contact: "Abdulla Abunasrah",
-    phone: "8002491095",
-    email: "abdulla.abunasrah@givemethevin.com"
+    "name": "Abdulla Abunasrah",
+    "company": "GMTV",
+    "type": "dealer",
+    "contact": {
+      "phone": "(800) 249-1095",
+      "email": "abdulla.abunasrah@givemethevin.com",
+      "location": ""
+    }
   },
   {
-    name: "GMTV",
-    contact: "Trajan Burton",
-    phone: "",
-    email: ""
+    "name": "Trajan Burton",
+    "company": "GMTV",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Dupont Registry",
-    contact: "Chad Cunningham",
-    phone: "",
-    email: ""
+    "name": "Chad Cunningham",
+    "company": "Dupont Registry",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Tampa Auto Gallery",
-    contact: "Victor Falcon",
-    phone: "",
-    email: ""
+    "name": "Victor Falcon",
+    "company": "Tampa Auto Gallery",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "Tampa, FL"
+    }
   },
   {
-    name: "Falcon Motor Group",
-    contact: "Eric Elbaz",
-    phone: "",
-    email: ""
+    "name": "Eric Elbaz",
+    "company": "Falcon Motor Group",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Auffenberg Ford",
-    contact: "Aaron Payne",
-    phone: "",
-    email: ""
+    "name": "Aaron Payne",
+    "company": "Auffenberg Ford",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "AutoPark Dallas",
-    contact: "Tristen Bergen",
-    phone: "972-639-7707",
-    email: "tristan@autoparkdallas.com"
+    "name": "Tristen Bergen",
+    "company": "AutoPark Dallas",
+    "type": "dealer",
+    "contact": {
+      "phone": "(972) 639-7707",
+      "email": "tristan@autoparkdallas.com",
+      "location": "Dallas, TX"
+    }
   },
   {
-    name: "P1 Motorwerks",
-    contact: "Jay Rampuria",
-    phone: "",
-    email: ""
+    "name": "Jay Rampuria",
+    "company": "P1 Motorwerks",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Velocity Motorcars",
-    contact: "Brian Wallin",
-    phone: "",
-    email: ""
+    "name": "Brian Wallin",
+    "company": "Velocity Motorcars",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Vegas Auto Collection",
-    contact: "Houston Crosta",
-    phone: "",
-    email: ""
+    "name": "Houston Crosta",
+    "company": "Vegas Auto Collection",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "Las Vegas, NV"
+    }
   },
   {
-    name: "Brooklyn Auto Sales",
-    contact: "Adam Elazeh",
-    phone: "(718) 825-4678",
-    email: "Brooklynautosales2@gmail.com"
+    "name": "Adam Elazeh",
+    "company": "Brooklyn Auto Sales",
+    "type": "dealer",
+    "contact": {
+      "phone": "(718) 825-4678",
+      "email": "Brooklynautosales2@gmail.com",
+      "location": "Brooklyn, NY"
+    }
   },
   {
-    name: "Bentley New Jersey",
-    contact: "Frank Gebba",
-    phone: "",
-    email: ""
+    "name": "Frank Gebba",
+    "company": "Bentley New Jersey",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "New Jersey"
+    }
   },
   {
-    name: "Galpin Motors",
-    contact: "Adam Camasta",
-    phone: "",
-    email: ""
+    "name": "Adam Camasta",
+    "company": "Galpin Motors",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Recar",
-    contact: "Rodolfo Garza",
-    phone: "",
-    email: ""
+    "name": "Rodolfo Garza",
+    "company": "Recar",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Motorcars of Chicago",
-    contact: "Waseem Rehan",
-    phone: "",
-    email: ""
+    "name": "Waseem Rehan",
+    "company": "Motorcars of Chicago",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "Chicago, IL"
+    }
   },
   {
-    name: "JNBS Motorz",
-    contact: "Jared Hoyt",
-    phone: "",
-    email: ""
+    "name": "Jared Hoyt",
+    "company": "JNBS Motorz",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Porsche St. Louis",
-    contact: "Sara Batchelor",
-    phone: "",
-    email: ""
+    "name": "Sara Batchelor",
+    "company": "Porsche St. Louis",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "St. Louis, MO"
+    }
   },
   {
-    name: "Marshall Goldman",
-    contact: "Danny Baker",
-    phone: "",
-    email: ""
+    "name": "Danny Baker",
+    "company": "Marshall Goldman",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Tactical Fleet",
-    contact: "Chris Barta",
-    phone: "",
-    email: ""
+    "name": "Chris Barta",
+    "company": "Tactical Fleet",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "CLB Sports Cars",
-    contact: "Craig Becker",
-    phone: "",
-    email: ""
+    "name": "Craig Becker",
+    "company": "CLB Sports Cars",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Enthusiast Auto Sales",
-    contact: "Alex Vaughn",
-    phone: "",
-    email: ""
+    "name": "Alex Vaughn",
+    "company": "Enthusiast Auto Sales",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "J & S Autohaus",
-    contact: "George Saliba",
-    phone: "",
-    email: ""
+    "name": "George Saliba",
+    "company": "J & S Autohaus",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Avid Motorsports",
-    contact: "Blake McCombs",
-    phone: "",
-    email: ""
+    "name": "Blake McCombs",
+    "company": "Avid Motorsports",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Dave Sinclair Ford",
-    contact: "Pinky Persons",
-    phone: "",
-    email: ""
+    "name": "Pinky Persons",
+    "company": "Dave Sinclair Ford",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "Jim Butler Maserati",
-    contact: "Brett Estes",
-    phone: "",
-    email: ""
+    "name": "Brett Estes",
+    "company": "Jim Butler Maserati",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "HBI Auto",
-    contact: "Billy Wenk",
-    phone: "",
-    email: ""
+    "name": "Billy Wenk",
+    "company": "HBI Auto",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": ""
+    }
   },
   {
-    name: "1of1 MotorSports",
-    contact: "Scott Zankl",
-    phone: "(561) 756-1933",
-    email: "Scott@1of1motorsports.com"
+    "name": "Scott Zankl",
+    "company": "1of1 MotorSports",
+    "type": "dealer",
+    "contact": {
+      "phone": "(561) 756-1933",
+      "email": "Scott@1of1motorsports.com",
+      "location": "Florida"
+    }
   },
   {
-    name: "1of1 MotorSports",
-    contact: "Tyler Zankl",
-    phone: "561 405-0816",
-    email: "tyler@1of1motorsports.com"
+    "name": "Tyler Zankl",
+    "company": "1of1 MotorSports",
+    "type": "dealer",
+    "contact": {
+      "phone": "(561) 405-0816",
+      "email": "tyler@1of1motorsports.com",
+      "location": "Florida"
+    }
   },
   {
-    name: "Foreign Affairs Motorsports",
-    contact: "Amy Farnham",
-    phone: "561-923-5233",
-    email: "amyv4n@gmail.com"
+    "name": "Amy Farnham",
+    "company": "Foreign Affairs Motorsports",
+    "type": "dealer",
+    "contact": {
+      "phone": "(561) 923-5233",
+      "email": "amyv4n@gmail.com",
+      "location": "Florida"
+    }
   },
   {
-    name: "Republic Auto Group",
-    contact: "Simon M",
-    phone: "614-286-8891",
-    email: "Simon@republicautogroup.com"
+    "name": "Simon M",
+    "company": "Republic Auto Group",
+    "type": "dealer",
+    "contact": {
+      "phone": "(614) 286-8891",
+      "email": "Simon@republicautogroup.com",
+      "location": "Ohio"
+    }
   },
   {
-    name: "Ferrari Long Island",
-    contact: "",
-    phone: "551-228-9864",
-    email: "edefrancesco@ferrarili.com"
+    "name": "",
+    "company": "Ferrari Long Island",
+    "type": "dealer",
+    "contact": {
+      "phone": "(551) 228-9864",
+      "email": "edefrancesco@ferrarili.com",
+      "location": "Long Island, NY"
+    }
   },
   {
-    name: "Exotic Motorsports of OK",
-    contact: "Eliud Villarreal",
-    phone: "405-664-2073",
-    email: "eliud@exoticmotorsportsok.com"
+    "name": "Eliud Villarreal",
+    "company": "Exotic Motorsports of OK",
+    "type": "dealer",
+    "contact": {
+      "phone": "(405) 664-2073",
+      "email": "eliud@exoticmotorsportsok.com",
+      "location": "Oklahoma"
+    }
   },
   {
-    name: "Premier Auto Group of South Florida",
-    contact: "",
-    phone: "",
-    email: ""
+    "name": "",
+    "company": "Premier Auto Group of South Florida",
+    "type": "dealer",
+    "contact": {
+      "phone": "",
+      "email": "",
+      "location": "South Florida"
+    }
   },
   {
-    name: "Friendly Auto Sales",
-    contact: "",
-    phone: "479-899-7686",
-    email: "qwkcollections@gmail.com"
+    "name": "",
+    "company": "Friendly Auto Sales",
+    "type": "dealer",
+    "contact": {
+      "phone": "(479) 899-7686",
+      "email": "qwkcollections@gmail.com",
+      "location": ""
+    }
   },
   {
-    name: "Foreing Cars Italia",
-    contact: "Reade",
-    phone: "336-688-0637",
-    email: "rfulton@foreigncarsitali.com"
+    "name": "Reade",
+    "company": "Foreign Cars Italia",
+    "type": "dealer",
+    "contact": {
+      "phone": "(336) 688-0637",
+      "email": "rfulton@foreigncarsitali.com",
+      "location": ""
+    }
   }
 ];
 
-const API_BASE_URL = 'http://localhost:5001/api';
+// Configuration
+const BASE_URL = 'http://localhost:5001/api';
+const DELAY_BETWEEN_REQUESTS = 100; // 100ms delay between requests
 
-async function uploadDealers() {
-  console.log('🚀 Starting dealer upload...\n');
-  
-  let successCount = 0;
-  let errorCount = 0;
-  
-  for (const dealer of dealers) {
-    try {
-      console.log(`📝 Uploading: ${dealer.name}`);
+async function findExistingDealer(companyName) {
+  try {
+    // Search for existing dealer by company name
+    const response = await axios.get(`${BASE_URL}/dealers/search?q=${encodeURIComponent(companyName)}`);
+    
+    if (response.data && response.data.dealers && response.data.dealers.length > 0) {
+      // Find exact match by company name
+      const exactMatch = response.data.dealers.find(dealer => 
+        dealer.company && dealer.company.toLowerCase() === companyName.toLowerCase()
+      );
       
-      const dealerData = {
-        name: dealer.name,
-        contactPerson: dealer.contact || '',
-        phone: dealer.phone || '',
-        email: dealer.email || '',
-        status: 'active',
-        type: 'exotic',
-        location: {
-          city: '',
-          state: '',
-          country: 'USA'
-        },
-        notes: 'Uploaded via script'
-      };
-      
-      const response = await axios.post(`${API_BASE_URL}/dealers`, dealerData, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log(`✅ Success: ${dealer.name} (ID: ${response.data._id})`);
-      successCount++;
-      
-    } catch (error) {
-      console.error(`❌ Error uploading ${dealer.name}:`, error.response?.data?.error || error.message);
-      errorCount++;
+      if (exactMatch) {
+        return exactMatch;
+      }
     }
     
-    // Small delay to avoid overwhelming the server
-    await new Promise(resolve => setTimeout(resolve, 100));
+    return null;
+  } catch (error) {
+    console.log(`⚠️  Error searching for existing dealer ${companyName}:`, error.message);
+    return null;
   }
-  
-  console.log('\n📊 Upload Summary:');
-  console.log(`✅ Successful: ${successCount}`);
-  console.log(`❌ Failed: ${errorCount}`);
-  console.log(`📝 Total: ${dealers.length}`);
+}
+
+async function updateDealer(dealerId, updateData) {
+  try {
+    const response = await axios.put(`${BASE_URL}/dealers/${dealerId}`, updateData);
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to update dealer: ${error.response?.data?.error || error.message}`);
+  }
+}
+
+async function uploadDealers() {
+  console.log('🚀 Starting dealer upload/update process...');
+  console.log(`📊 Total dealers to process: ${dealers.length}`);
+  console.log('');
+
+  let createdCount = 0;
+  let updatedCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  for (let i = 0; i < dealers.length; i++) {
+    const dealer = dealers[i];
+    
+    try {
+      // Transform dealer data to match the backend API structure
+      const dealerData = {
+        name: dealer.name || dealer.company, // Use company as name if name is empty
+        company: dealer.company,
+        type: dealer.type,
+        phone: dealer.contact.phone,
+        email: dealer.contact.email,
+        location: dealer.contact.location
+      };
+
+      console.log(`📝 Processing ${i + 1}/${dealers.length}: ${dealerData.company}...`);
+      
+      // Check if dealer already exists
+      const existingDealer = await findExistingDealer(dealerData.company);
+      
+      if (existingDealer) {
+        console.log(`🔄 Found existing dealer: ${dealerData.company} (ID: ${existingDealer.id})`);
+        
+        // Prepare update data - only include fields that have values
+        const updateData = {};
+        if (dealerData.name && dealerData.name !== existingDealer.name) {
+          updateData.name = dealerData.name;
+        }
+        if (dealerData.phone && dealerData.phone !== existingDealer.phone) {
+          updateData.phone = dealerData.phone;
+        }
+        if (dealerData.email && dealerData.email !== existingDealer.email) {
+          updateData.email = dealerData.email;
+        }
+        if (dealerData.location && dealerData.location !== existingDealer.location) {
+          updateData.location = dealerData.location;
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          await updateDealer(existingDealer.id, updateData);
+          console.log(`✅ Updated: ${dealerData.company} with new data`);
+          updatedCount++;
+        } else {
+          console.log(`ℹ️  No changes needed: ${dealerData.company}`);
+        }
+        
+      } else {
+        // Create new dealer
+        console.log(`➕ Creating new dealer: ${dealerData.company}`);
+        const response = await axios.post(`${BASE_URL}/dealers`, dealerData);
+        
+        if (response.data && response.data.id) {
+          console.log(`✅ Created: ${dealerData.company} (ID: ${response.data.id})`);
+          createdCount++;
+        } else {
+          console.log(`⚠️  Warning: ${dealerData.company} - No ID returned`);
+          createdCount++;
+        }
+      }
+
+      // Add delay between requests to avoid overwhelming the server
+      if (i < dealers.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+      }
+
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || error.message;
+      console.log(`❌ Error: ${dealer.company} - ${errorMessage}`);
+      errors.push({
+        dealer: dealer.company,
+        error: errorMessage
+      });
+      errorCount++;
+    }
+  }
+
+  console.log('');
+  console.log('📊 Upload/Update Summary:');
+  console.log(`✅ Created: ${createdCount}`);
+  console.log(`🔄 Updated: ${updatedCount}`);
+  console.log(`❌ Errors: ${errorCount}`);
+  console.log(`📈 Success Rate: ${(((createdCount + updatedCount) / dealers.length) * 100).toFixed(1)}%`);
+
+  if (errors.length > 0) {
+    console.log('');
+    console.log('❌ Error Details:');
+    errors.forEach((err, index) => {
+      console.log(`${index + 1}. ${err.dealer}: ${err.error}`);
+    });
+  }
+
+  console.log('');
+  console.log('🎉 Upload/update process completed!');
 }
 
 // Run the upload

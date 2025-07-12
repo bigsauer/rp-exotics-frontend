@@ -1,8 +1,10 @@
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const dealerRoutes = require('./routes/dealers');
 require('dotenv').config();
 
 const app = express();
@@ -80,6 +82,13 @@ async function connectToDatabase() {
     db = client.db('rp_exotics');
     console.log('✅ Connected to MongoDB Atlas');
     
+    // Connect Mongoose
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('✅ Connected to MongoDB with Mongoose');
+    
     // Create indexes for better performance
     await createIndexes();
   } catch (error) {
@@ -111,6 +120,9 @@ async function createIndexes() {
 }
 
 // =================== ROUTES ===================
+
+// Mount dealer routes
+app.use('/api/dealers', dealerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -563,8 +575,23 @@ app.get('/api/dealers/:id', async (req, res) => {
 // Create new dealer
 app.post('/api/dealers', async (req, res) => {
   try {
-    const dealer = {
-      ...req.body,
+    // Transform the request body to match the new schema structure
+    const dealerData = {
+      name: req.body.name,
+      company: req.body.company || req.body.name,
+      type: req.body.type || 'dealer',
+      contact: {
+        phone: req.body.phone || req.body.contactPerson || '',
+        email: req.body.email ? req.body.email.toLowerCase() : '',
+        address: {
+          street: req.body.address?.street || '',
+          city: req.body.address?.city || req.body.location?.city || '',
+          state: req.body.address?.state || req.body.location?.state || '',
+          zip: req.body.address?.zip || ''
+        }
+      },
+      notes: req.body.notes || 'Uploaded via API',
+      isActive: req.body.isActive !== false,
       metrics: {
         totalDeals: 0,
         totalPurchaseVolume: 0,
@@ -577,11 +604,11 @@ app.post('/api/dealers', async (req, res) => {
       updatedAt: new Date()
     };
     
-    const result = await db.collection('dealers').insertOne(dealer);
+    const result = await db.collection('dealers').insertOne(dealerData);
     res.json({ 
       id: result.insertedId, 
       message: 'Dealer created successfully',
-      dealer: { ...dealer, _id: result.insertedId }
+      dealer: { ...dealerData, _id: result.insertedId }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
