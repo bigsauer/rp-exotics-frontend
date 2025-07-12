@@ -12,35 +12,71 @@ const dealerSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['dealer', 'private', 'auction', 'wholesaler'],
-    default: 'dealer'
+    enum: ['Dealer', 'Private Seller', 'Auction', 'Wholesaler'],
+    default: 'Dealer'
   },
   contact: {
+    address: String,
     phone: String,
     email: {
       type: String,
       lowercase: true
     },
-    address: {
-      street: String,
-      city: String,
-      state: String,
-      zip: String
+    location: String // City, State
+  },
+  performance: {
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    totalDeals: {
+      type: Number,
+      default: 0
+    },
+    totalVolume: {
+      type: Number,
+      default: 0
+    },
+    avgDealSize: {
+      type: Number,
+      default: 0
+    },
+    responseTime: {
+      type: String,
+      default: 'N/A'
+    },
+    successRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
     }
   },
-  dealHistory: [{
-    dealId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Deal'
-    },
-    date: Date,
-    amount: Number,
-    vehicle: String
+  status: {
+    type: String,
+    enum: ['Active', 'Inactive', 'Pending'],
+    default: 'Active'
+  },
+  specialties: [{
+    type: String,
+    trim: true
   }],
   notes: String,
-  isActive: {
-    type: Boolean,
-    default: true
+  recentDeals: [{
+    vehicle: String,
+    amount: Number,
+    date: Date,
+    status: {
+      type: String,
+      enum: ['Completed', 'Pending', 'Cancelled'],
+      default: 'Completed'
+    }
+  }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true
@@ -50,7 +86,22 @@ const dealerSchema = new mongoose.Schema({
 dealerSchema.index({ 
   name: 'text', 
   company: 'text',
-  'contact.email': 'text'
+  'contact.email': 'text',
+  'contact.location': 'text',
+  specialties: 'text'
 });
+
+// Virtual for last deal date
+dealerSchema.virtual('lastDeal').get(function() {
+  if (this.recentDeals && this.recentDeals.length > 0) {
+    const lastDeal = this.recentDeals.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    return lastDeal.date ? new Date(lastDeal.date).toLocaleDateString() : 'N/A';
+  }
+  return 'N/A';
+});
+
+// Ensure virtuals are serialized
+dealerSchema.set('toJSON', { virtuals: true });
+dealerSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Dealer', dealerSchema); 

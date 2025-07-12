@@ -1,18 +1,21 @@
 const mongoose = require('mongoose');
 
 const dealSchema = new mongoose.Schema({
-  // Vehicle Information
+  // Basic Deal Information
+  vehicle: {
+    type: String,
+    required: true,
+    trim: true
+  },
   vin: {
     type: String,
     required: true,
-    length: 17,
-    uppercase: true
+    unique: true,
+    trim: true
   },
   year: {
     type: Number,
-    required: true,
-    min: 1900,
-    max: new Date().getFullYear() + 2
+    required: true
   },
   make: {
     type: String,
@@ -24,81 +27,31 @@ const dealSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  mileage: {
-    type: Number,
-    min: 0
-  },
-  exteriorColor: String,
-  interiorColor: String,
-  numberOfKeys: {
-    type: Number,
-    min: 0,
-    max: 10
-  },
-  
-  // Deal Information
-  dealType: {
+  stockNumber: {
     type: String,
     required: true,
-    enum: ['wholesale-d2d', 'wholesale-private', 'wholesale-flip', 'retail-pp', 'retail-auction', 'retail-dtod', 'auction']
+    unique: true,
+    trim: true
   },
-  fundingSource: {
-    type: String,
-    required: true,
-    enum: ['flpn-retail', 'flpn-wholesale', 'cash', 'flooring-line', 'consignment']
+
+  // Purchase Information
+  purchasePrice: {
+    type: Number,
+    required: true
   },
   purchaseDate: {
     type: Date,
     required: true
   },
-  paymentMethod: {
-    type: String,
-    required: true,
-    enum: ['check', 'wire', 'ach', 'cash', 'financed']
+  listPrice: {
+    type: Number,
+    required: true
   },
-  currentStage: {
-    type: String,
-    required: true,
-    enum: ['initial-contact', 'price-negotiated', 'inspection-scheduled', 'inspection-complete', 'purchased', 'title-processing', 'title-received', 'ready-to-list', 'listed', 'sold', 'delivered'],
-    default: 'initial-contact'
+  killPrice: {
+    type: Number,
+    required: true
   },
-  
-  // Financial Information
-  financial: {
-    purchasePrice: {
-      type: Number,
-      min: 0
-    },
-    listPrice: {
-      type: Number,
-      min: 0
-    },
-    killPrice: {
-      type: Number,
-      min: 0
-    },
-    wholesalePrice: {
-      type: Number,
-      min: 0
-    },
-    commissionRate: {
-      type: Number,
-      min: 0,
-      max: 100
-    },
-    brokerageFee: {
-      type: Number,
-      min: 0
-    },
-    brokeerageFeePaidTo: String,
-    payoffBalance: {
-      type: Number,
-      min: 0
-    },
-    amountDueToCustomer: Number,
-    amountDueToRP: Number
-  },
-  
+
   // Seller Information
   seller: {
     name: {
@@ -106,107 +59,253 @@ const dealSchema = new mongoose.Schema({
       required: true,
       trim: true
     },
-    company: String,
-    address: String,
-    phone: String,
-    email: {
+    type: {
       type: String,
-      lowercase: true,
-      validate: {
-        validator: function(v) {
-          return !v || /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
-        },
-        message: 'Please enter a valid email'
-      }
+      enum: ['dealer', 'private', 'auction'],
+      default: 'dealer'
+    },
+    contact: {
+      address: String,
+      phone: String,
+      email: String
+    },
+    dealerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Dealer'
     }
   },
-  
-  // RP Information
-  rpStockNumber: {
-    type: String
+
+  // Deal Classification
+  dealType: {
+    type: String,
+    enum: ['wholesale', 'retail', 'consignment'],
+    default: 'retail'
   },
-  vehicleDescription: String,
-  generalNotes: String,
-  
-  // Documentation
-  documentation: {
-    contractRequired: {
+  fundingSource: String,
+  paymentMethod: String,
+
+  // Back Office Workflow
+  currentStage: {
+    type: String,
+    enum: ['documentation', 'verification', 'processing', 'completion'],
+    default: 'documentation'
+  },
+  priority: {
+    type: String,
+    enum: ['high', 'medium', 'low'],
+    default: 'medium'
+  },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+
+  // Document Tracking
+  documents: [{
+    type: {
+      type: String,
+      required: true
+    },
+    fileName: String,
+    filePath: String,
+    fileSize: Number,
+    mimeType: String,
+    uploaded: {
       type: Boolean,
       default: false
     },
-    titlePresent: {
+    uploadedAt: Date,
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    approved: {
       type: Boolean,
       default: false
     },
-    driverLicensePresent: {
+    approvedAt: Date,
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    required: {
+      type: Boolean,
+      default: true
+    },
+    notes: String,
+    expirationDate: Date,
+    version: {
+      type: Number,
+      default: 1
+    }
+  }],
+
+  // Title Information
+  titleInfo: {
+    status: {
+      type: String,
+      enum: ['clean', 'lien', 'salvage', 'flood', 'pending'],
+      default: 'pending'
+    },
+    state: String,
+    titleNumber: String,
+    lienHolder: String,
+    lienAmount: Number,
+    titleReceived: {
       type: Boolean,
       default: false
     },
-    odometerPresent: {
-      type: Boolean,
-      default: false
+    titleReceivedDate: Date,
+    titleNotes: String
+  },
+
+  // Financial Status
+  financial: {
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'partial'],
+      default: 'pending'
     },
-    dealerLicensePresent: {
-      type: Boolean,
-      default: false
+    payoffBalance: Number,
+    amountDueToCustomer: Number,
+    amountDueToRP: Number,
+    commission: {
+      rate: Number,
+      amount: Number,
+      paidTo: String
     }
   },
-  
+
+  // Compliance & Legal
+  compliance: {
+    contractSigned: {
+      type: Boolean,
+      default: false
+    },
+    contractDate: Date,
+    driversLicenseVerified: {
+      type: Boolean,
+      default: false
+    },
+    odometerVerified: {
+      type: Boolean,
+      default: false
+    },
+    dealerLicenseVerified: {
+      type: Boolean,
+      default: false
+    },
+    insuranceVerified: {
+      type: Boolean,
+      default: false
+    },
+    inspectionCompleted: {
+      type: Boolean,
+      default: false
+    },
+    inspectionDate: Date
+  },
+
+  // Workflow History
+  workflowHistory: [{
+    stage: {
+      type: String,
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    notes: String,
+    previousStage: String
+  }],
+
+  // Activity Log
+  activityLog: [{
+    action: {
+      type: String,
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    description: String,
+    metadata: mongoose.Schema.Types.Mixed
+  }],
+
   // System Fields
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false,
-    default: null
+    ref: 'User'
   },
-  isDraft: {
-    type: Boolean,
-    default: false
-  },
-  
-  // VIN Decode Data
-  vinDecodeData: {
-    trim: String,
-    bodyStyle: String,
-    engine: String,
-    transmission: String,
-    driveType: String,
-    decodedAt: Date
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
 // Indexes for performance
 dealSchema.index({ vin: 1 });
-dealSchema.index({ rpStockNumber: 1 });
-dealSchema.index({ createdBy: 1 });
+dealSchema.index({ stockNumber: 1 });
 dealSchema.index({ currentStage: 1 });
-dealSchema.index({ dealType: 1 });
-dealSchema.index({ isDraft: 1 });
+dealSchema.index({ assignedTo: 1 });
+dealSchema.index({ purchaseDate: -1 });
+dealSchema.index({ 'seller.name': 'text', vehicle: 'text' });
 
-// Virtual for profit calculation
-dealSchema.virtual('profit').get(function() {
-  if (this.financial.listPrice && this.financial.purchasePrice) {
-    return this.financial.listPrice - this.financial.purchasePrice;
-  }
-  return null;
+// Virtual for completion percentage
+dealSchema.virtual('completionPercentage').get(function() {
+  const requiredDocuments = this.documents.filter(doc => doc.required);
+  const approvedDocuments = requiredDocuments.filter(doc => doc.approved);
+  
+  if (requiredDocuments.length === 0) return 0;
+  return Math.round((approvedDocuments.length / requiredDocuments.length) * 100);
 });
 
-// Pre-save middleware to generate stock number
-dealSchema.pre('save', async function(next) {
-  if (!this.rpStockNumber) {
-    const year = new Date().getFullYear();
-    const count = await this.constructor.countDocuments({
-      rpStockNumber: { $regex: `^RP${year}` }
+// Virtual for pending documents count
+dealSchema.virtual('pendingDocumentsCount').get(function() {
+  return this.documents.filter(doc => doc.required && !doc.approved).length;
+});
+
+// Virtual for overdue documents
+dealSchema.virtual('overdueDocuments').get(function() {
+  const now = new Date();
+  return this.documents.filter(doc => 
+    doc.required && 
+    !doc.approved && 
+    doc.expirationDate && 
+    doc.expirationDate < now
+  );
+});
+
+// Ensure virtuals are serialized
+dealSchema.set('toJSON', { virtuals: true });
+dealSchema.set('toObject', { virtuals: true });
+
+// Pre-save middleware to add workflow history
+dealSchema.pre('save', function(next) {
+  if (this.isModified('currentStage')) {
+    this.workflowHistory.push({
+      stage: this.currentStage,
+      timestamp: new Date(),
+      changedBy: this.updatedBy || this.createdBy,
+      notes: 'Stage updated',
+      previousStage: this._original?.currentStage || 'initial'
     });
-    this.rpStockNumber = `RP${year}${String(count + 1).padStart(4, '0')}`;
   }
   next();
 });
-
-
 
 module.exports = mongoose.model('Deal', dealSchema); 
