@@ -439,9 +439,16 @@ async function uploadDealers() {
         name: dealer.name || dealer.company, // Use company as name if name is empty
         company: dealer.company,
         type: dealer.type,
-        phone: dealer.contact.phone,
-        email: dealer.contact.email,
-        location: dealer.contact.location
+        contact: {
+          phone: dealer.contact.phone || '',
+          email: dealer.contact.email ? dealer.contact.email.toLowerCase() : '',
+          address: {
+            street: '',
+            city: dealer.contact.location ? dealer.contact.location.split(',')[0]?.trim() : '',
+            state: dealer.contact.location ? dealer.contact.location.split(',')[1]?.trim() : '',
+            zip: ''
+          }
+        }
       };
 
       console.log(`📝 Processing ${i + 1}/${dealers.length}: ${dealerData.company}...`);
@@ -457,14 +464,17 @@ async function uploadDealers() {
         if (dealerData.name && dealerData.name !== existingDealer.name) {
           updateData.name = dealerData.name;
         }
-        if (dealerData.phone && dealerData.phone !== existingDealer.phone) {
-          updateData.phone = dealerData.phone;
+        if (dealerData.contact.phone && dealerData.contact.phone !== existingDealer.phone) {
+          updateData.contact = { ...updateData.contact, phone: dealerData.contact.phone };
         }
-        if (dealerData.email && dealerData.email !== existingDealer.email) {
-          updateData.email = dealerData.email;
+        if (dealerData.contact.email && dealerData.contact.email !== existingDealer.email) {
+          updateData.contact = { ...updateData.contact, email: dealerData.contact.email };
         }
-        if (dealerData.location && dealerData.location !== existingDealer.location) {
-          updateData.location = dealerData.location;
+        if (dealerData.contact.address.city && dealerData.contact.address.city !== existingDealer.location) {
+          updateData.contact = { 
+            ...updateData.contact, 
+            address: { ...updateData.contact.address, city: dealerData.contact.address.city }
+          };
         }
         
         if (Object.keys(updateData).length > 0) {
