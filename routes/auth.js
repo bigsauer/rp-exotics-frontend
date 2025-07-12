@@ -36,10 +36,10 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Login endpoint
+// Login endpoint with Remember Me functionality
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe = false } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -65,20 +65,28 @@ router.post('/login', async (req, res) => {
                   user.role === 'finance' ? 'Finance' : 'Sales'
     };
 
+    // Set token expiration based on rememberMe
+    // If rememberMe is true: 12 hours, otherwise: 24 hours
+    const tokenExpiration = rememberMe ? '12h' : '24h';
+
     // Generate JWT token
     const token = jwt.sign(
       { 
         email: email, 
         role: user.role,
-        displayName: user.displayName 
+        displayName: user.displayName,
+        rememberMe: rememberMe,
+        loginTime: new Date().toISOString()
       }, 
       JWT_SECRET, 
-      { expiresIn: '24h' }
+      { expiresIn: tokenExpiration }
     );
 
     res.json({
       success: true,
       token: token,
+      expiresIn: tokenExpiration,
+      rememberMe: rememberMe,
       user: {
         profile: profile,
         role: user.role
@@ -87,6 +95,58 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if user is still logged in (within 12 hours if rememberMe was used)
+router.get('/check-session', authenticateToken, (req, res) => {
+  try {
+    const user = TEAM_MEMBERS[req.user.email];
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if this was a "remember me" session and if it's still within 12 hours
+    const loginTime = new Date(req.user.loginTime);
+    const currentTime = new Date();
+    const hoursSinceLogin = (currentTime - loginTime) / (1000 * 60 * 60);
+
+    // If rememberMe was used and it's been more than 12 hours, require re-login
+    if (req.user.rememberMe && hoursSinceLogin > 12) {
+      return res.status(401).json({ 
+        error: 'Session expired', 
+        message: 'Please log in again',
+        expired: true
+      });
+    }
+
+    const profile = {
+      displayName: user.displayName,
+      email: req.user.email,
+      role: user.role,
+      department: user.role === 'admin' ? 'Administration' : 
+                  user.role === 'finance' ? 'Finance' : 'Sales'
+    };
+
+    // Define permissions based on role
+    const permissions = {
+      sales: ['view_deals', 'create_deals', 'edit_deals'],
+      admin: ['view_deals', 'create_deals', 'edit_deals', 'delete_deals', 'manage_users', 'view_reports'],
+      finance: ['view_deals', 'view_reports', 'manage_finances']
+    };
+
+    res.json({
+      success: true,
+      profile: profile,
+      permissions: permissions[user.role] || [],
+      rememberMe: req.user.rememberMe,
+      loginTime: req.user.loginTime,
+      hoursSinceLogin: Math.round(hoursSinceLogin * 100) / 100
+    });
+
+  } catch (error) {
+    console.error('Session check error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
