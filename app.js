@@ -377,6 +377,22 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   }
 });
 
+// Check session endpoint for frontend compatibility
+app.get('/api/auth/check-session', authenticateToken, async (req, res) => {
+  try {
+    // req.user is set by authenticateToken middleware
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    res.json({
+      status: 'OK',
+      user: req.user
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update user profile
 app.put('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
@@ -1248,5 +1264,4 @@ process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server...');
   await client.close();
   process.exit(0);
-}); // Force redeploy Sat Jul 12 23:50:42 CDT 2025
-// CHECK-SESSION ENDPOINT EXISTS - FORCE REDEPLOY Sat Jul 12 23:58:41 CDT 2025
+}); 
