@@ -1249,3 +1249,4 @@ process.on('SIGINT', async () => {
   await client.close();
   process.exit(0);
 }); // Force redeploy Sat Jul 12 23:50:42 CDT 2025
+// CHECK-SESSION ENDPOINT EXISTS - FORCE REDEPLOY Sat Jul 12 23:58:41 CDT 2025
