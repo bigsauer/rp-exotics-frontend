@@ -1264,4 +1264,4 @@ process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server...');
   await client.close();
   process.exit(0);
-}); 
+}); // FORCE REDEPLOY Sun Jul 13 00:11:31 CDT 2025
