@@ -7,6 +7,8 @@ const AppFlow = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Add error state
+  const [error, setError] = useState('');
 
   // Check for existing authentication on component mount
   useEffect(() => {
@@ -16,23 +18,32 @@ const AppFlow = () => {
         if (token) {
           // Try to validate the token using check-session endpoint
           const sessionResponse = await ApiService.checkSession();
-          if (sessionResponse && sessionResponse.success) {
-            // Transform the session response to match the expected user structure
+          console.log('Raw sessionResponse:', sessionResponse);
+          if (sessionResponse && sessionResponse.success && sessionResponse.profile) {
+            // Defensive: ensure role exists
+            const role = sessionResponse.profile.role || sessionResponse.role || null;
+            const name = sessionResponse.profile.displayName || sessionResponse.profile.name || '';
+            const email = sessionResponse.profile.email || sessionResponse.email || '';
             const userData = {
-              name: sessionResponse.profile.displayName,
-              email: sessionResponse.profile.email,
-              role: sessionResponse.profile.role,
+              name,
+              email,
+              role,
               profile: sessionResponse.profile
-              // Note: BeautifulDarkLanding uses its own permissions object based on role
             };
-            console.log('Session response:', sessionResponse);
             console.log('Transformed user data:', userData);
-            setCurrentUser(userData);
-            setIsLoggedIn(true);
+            if (role) {
+              setCurrentUser(userData);
+              setIsLoggedIn(true);
+            } else {
+              setCurrentUser(null);
+              setIsLoggedIn(false);
+              setError('Your user account is missing a role. Please contact support.');
+            }
           } else {
             // Token is invalid, clear it
             localStorage.removeItem('authToken');
             ApiService.setToken(null);
+            setError('Session invalid or user data malformed. Please log in again.');
           }
         }
       } catch (error) {
@@ -40,6 +51,7 @@ const AppFlow = () => {
         // Clear invalid token
         localStorage.removeItem('authToken');
         ApiService.setToken(null);
+        setError('Authentication check failed. Please log in again.');
       } finally {
         setIsLoading(false);
       }
@@ -71,6 +83,23 @@ const AppFlow = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user data is malformed
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-400 text-lg font-semibold mb-4">{error}</div>
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
         </div>
       </div>
     );
