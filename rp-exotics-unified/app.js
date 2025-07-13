@@ -459,6 +459,7 @@ app.get('/api/auth/check-session', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
     // Return the structure expected by the frontend
+    // v2: forced redeploy for frontend compatibility
     return res.json({
       success: true,
       profile: {
