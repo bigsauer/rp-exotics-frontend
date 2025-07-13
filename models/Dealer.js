@@ -16,7 +16,12 @@ const dealerSchema = new mongoose.Schema({
     default: 'Dealer'
   },
   contact: {
-    address: String,
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zip: String
+    },
     phone: String,
     email: {
       type: String,

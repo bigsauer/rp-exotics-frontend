@@ -7,20 +7,25 @@ const app = express();
 
 // CORS configuration to allow frontend to connect
 const allowedOrigins = [
-  'http://localhost:3000',  // React development server
-  'http://localhost:3001',  // Alternative React port
-  'http://localhost:5000',  // Your existing backend
-  'https://rp-exotics-frontend.vercel.app',  // Vercel frontend
-  'https://rp-exotics-frontend.railway.app', // Railway frontend
-  process.env.FRONTEND_URL // Environment variable for frontend URL
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5000',
+  'https://rp-exotics-frontend.vercel.app',
+  'https://rp-exotics-frontend.railway.app',
+  process.env.FRONTEND_URL
 ].filter(Boolean);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow all Vercel preview URLs
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return true;
+  return false;
+}
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

@@ -8,18 +8,34 @@ const dealerRoutes = require('./routes/dealers');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5001;
 const JWT_SECRET = process.env.JWT_SECRET || 'rp_exotics_super_secret_key_2025_change_this_in_production';
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://rp-exotics-frontend.vercel.app',
+  'https://rp-exotics-frontend.netlify.app',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow all Vercel preview URLs
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return true;
+  return false;
+}
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'https://rp-exotics-frontend.vercel.app',
-    'https://rp-exotics-frontend.netlify.app'
-  ],
+  origin: function (origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -93,7 +109,16 @@ async function connectToDatabase() {
     await createIndexes();
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
+    console.log('🔧 To fix this issue:');
+    console.log('1. For local development: Install MongoDB locally');
+    console.log('   - macOS: brew install mongodb-community');
+    console.log('   - Then run: brew services start mongodb-community');
+    console.log('2. For cloud development: Set up MongoDB Atlas');
+    console.log('   - Create a free account at https://mongodb.com/atlas');
+    console.log('   - Create a cluster and get your connection string');
+    console.log('   - Add MONGODB_URI to your .env file');
+    console.log('3. For Railway deployment: Set MONGODB_URI in Railway dashboard');
+    console.log('⚠️  Server will continue running but database operations will fail');
   }
 }
 
@@ -349,6 +374,22 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// Check session endpoint for frontend compatibility
+app.get('/api/auth/check-session', authenticateToken, async (req, res) => {
+  try {
+    // req.user is set by authenticateToken middleware
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    res.json({
+      status: 'OK',
+      user: req.user
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -1204,7 +1245,11 @@ async function updateDealerHistory(dealerName, dealId, dealData) {
 // =================== SERVER STARTUP ===================
 
 async function startServer() {
-  await connectToDatabase();
+  try {
+    await connectToDatabase();
+  } catch (error) {
+    console.log('⚠️  Continuing without database connection...');
+  }
   
   app.listen(PORT, () => {
     console.log(`🚀 RP Exotics API running on port ${PORT}`);
@@ -1219,4 +1264,4 @@ process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server...');
   await client.close();
   process.exit(0);
-}); 
+}); // FORCE REDEPLOY Sun Jul 13 00:11:31 CDT 2025
