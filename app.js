@@ -330,6 +330,28 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
   }
 });
 
+// User logout
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    // In a stateless JWT system, the client is responsible for removing the token
+    // We can log the logout event for audit purposes
+    await db.collection('users').updateOne(
+      { _id: req.user._id },
+      { 
+        $set: { 
+          lastLogout: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    res.json({ message: 'Logout successful' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
 // Update user profile
 app.put('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
@@ -785,6 +807,334 @@ app.put('/api/deals/:id', async (req, res) => {
     res.json({ message: 'Deal updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// =================== BACK OFFICE DEALS ENDPOINTS ===================
+
+// Get back office deals (with filtering and pagination)
+app.get('/api/deals/backoffice', authenticateToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    
+    // Build query based on filters
+    let query = {};
+    
+    if (req.query.stage) {
+      query.currentStage = req.query.stage;
+    }
+    
+    if (req.query.priority) {
+      query.priority = req.query.priority;
+    }
+    
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+    
+    if (req.query.search) {
+      query.$or = [
+        { vin: { $regex: req.query.search, $options: 'i' } },
+        { rpStockNumber: { $regex: req.query.search, $options: 'i' } },
+        { 'seller.name': { $regex: req.query.search, $options: 'i' } },
+        { 'seller.company': { $regex: req.query.search, $options: 'i' } }
+      ];
+    }
+    
+    // Role-based filtering
+    if (req.user.role === 'sales') {
+      // Sales users can only see their own deals or deals they have access to
+      query.$or = [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id },
+        { 'seller.name': { $exists: true } } // Allow viewing deals with sellers
+      ];
+    }
+    
+    const deals = await db.collection('deals')
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+      
+    const total = await db.collection('deals').countDocuments(query);
+    
+    // Transform deals to match frontend expectations
+    const transformedDeals = deals.map(deal => ({
+      id: deal._id.toString(),
+      vin: deal.vin,
+      stockNumber: deal.rpStockNumber,
+      vehicle: `${deal.year || ''} ${deal.make || ''} ${deal.model || ''}`.trim(),
+      seller: deal.seller,
+      buyer: deal.buyer,
+      currentStage: deal.currentStage,
+      priority: deal.priority,
+      status: deal.status,
+      purchasePrice: deal.financial?.purchasePrice,
+      salePrice: deal.financial?.salePrice,
+      purchaseDate: deal.purchaseDate,
+      saleDate: deal.saleDate,
+      documentation: deal.documentation,
+      compliance: deal.compliance,
+      titleInfo: deal.titleInfo,
+      notes: deal.generalNotes,
+      createdAt: deal.createdAt,
+      updatedAt: deal.updatedAt,
+      completionPercentage: deal.completionPercentage || 0,
+      pendingDocumentsCount: deal.pendingDocumentsCount || 0,
+      overdueDocuments: deal.overdueDocuments || []
+    }));
+    
+    res.json({
+      success: true,
+      data: transformedDeals,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Back office deals error:', error);
+    res.status(500).json({ error: 'Failed to retrieve deals' });
+  }
+});
+
+// Get single back office deal
+app.get('/api/deals/backoffice/:id', authenticateToken, async (req, res) => {
+  try {
+    const deal = await db.collection('deals')
+      .findOne({ _id: new ObjectId(req.params.id) });
+    
+    if (!deal) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+    
+    // Role-based access control
+    if (req.user.role === 'sales' && deal.createdBy !== req.user._id && deal.assignedTo !== req.user._id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json({
+      success: true,
+      data: deal
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve deal' });
+  }
+});
+
+// Update deal stage
+app.put('/api/deals/:id/stage', authenticateToken, async (req, res) => {
+  try {
+    const { stage, notes } = req.body;
+    
+    if (!stage) {
+      return res.status(400).json({ error: 'Stage is required' });
+    }
+    
+    const updateData = {
+      currentStage: stage,
+      updatedAt: new Date()
+    };
+    
+    // Add to workflow history
+    const historyEntry = {
+      stage: stage,
+      timestamp: new Date(),
+      updatedBy: req.user._id,
+      notes: notes || ''
+    };
+    
+    const result = await db.collection('deals').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { 
+        $set: updateData,
+        $push: { workflowHistory: historyEntry }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+    
+    res.json({ message: 'Deal stage updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Approve document
+app.put('/api/deals/:id/documents/:documentType/approve', authenticateToken, async (req, res) => {
+  try {
+    const { documentType } = req.params;
+    const { approved, notes } = req.body;
+    
+    const updateData = {
+      [`documentation.${documentType}Present`]: approved,
+      updatedAt: new Date()
+    };
+    
+    // Add to activity log
+    const activityEntry = {
+      action: approved ? 'document_approved' : 'document_rejected',
+      documentType: documentType,
+      timestamp: new Date(),
+      performedBy: req.user._id,
+      notes: notes || ''
+    };
+    
+    const result = await db.collection('deals').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { 
+        $set: updateData,
+        $push: { activityLog: activityEntry }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+    
+    res.json({ message: 'Document status updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =================== SALES DEALS ENDPOINTS ===================
+
+// Get sales deals (for sales representatives)
+app.get('/api/deals/sales', authenticateToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    
+    // Build query based on filters
+    let query = {};
+    
+    if (req.query.stage) {
+      query.currentStage = req.query.stage;
+    }
+    
+    if (req.query.priority) {
+      query.priority = req.query.priority;
+    }
+    
+    if (req.query.search) {
+      query.$or = [
+        { vin: { $regex: req.query.search, $options: 'i' } },
+        { rpStockNumber: { $regex: req.query.search, $options: 'i' } },
+        { 'seller.name': { $regex: req.query.search, $options: 'i' } },
+        { 'seller.company': { $regex: req.query.search, $options: 'i' } }
+      ];
+    }
+    
+    // Sales users can see all deals but with limited financial info
+    const deals = await db.collection('deals')
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+      
+    const total = await db.collection('deals').countDocuments(query);
+    
+    // Transform deals for sales view (hide sensitive financial data for non-admin users)
+    const transformedDeals = deals.map(deal => {
+      const transformedDeal = {
+        id: deal._id.toString(),
+        vin: deal.vin,
+        stockNumber: deal.rpStockNumber,
+        vehicle: `${deal.year || ''} ${deal.make || ''} ${deal.model || ''}`.trim(),
+        seller: deal.seller,
+        buyer: deal.buyer,
+        currentStage: deal.currentStage,
+        priority: deal.priority,
+        status: deal.status,
+        purchaseDate: deal.purchaseDate,
+        saleDate: deal.saleDate,
+        notes: deal.generalNotes,
+        createdAt: deal.createdAt,
+        updatedAt: deal.updatedAt,
+        completionPercentage: deal.completionPercentage || 0,
+        pendingDocumentsCount: deal.pendingDocumentsCount || 0
+      };
+      
+      // Only show financial data to admin and finance users
+      if (req.user.role === 'admin' || req.user.role === 'finance') {
+        transformedDeal.purchasePrice = deal.financial?.purchasePrice;
+        transformedDeal.salePrice = deal.financial?.salePrice;
+      }
+      
+      return transformedDeal;
+    });
+    
+    res.json({
+      success: true,
+      data: transformedDeals,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Sales deals error:', error);
+    res.status(500).json({ error: 'Failed to retrieve deals' });
+  }
+});
+
+// Get sales statistics
+app.get('/api/deals/sales/stats', authenticateToken, async (req, res) => {
+  try {
+    const stats = await db.collection('deals').aggregate([
+      {
+        $group: {
+          _id: null,
+          totalDeals: { $sum: 1 },
+          activeDeals: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'active'] }, 1, 0]
+            }
+          },
+          completedDeals: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
+            }
+          },
+          totalVolume: {
+            $sum: {
+              $cond: [
+                { $eq: ['$status', 'completed'] },
+                { $add: ['$financial.purchasePrice', '$financial.salePrice'] },
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]).toArray();
+    
+    const result = stats[0] || {
+      totalDeals: 0,
+      activeDeals: 0,
+      completedDeals: 0,
+      totalVolume: 0
+    };
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve statistics' });
   }
 });
 

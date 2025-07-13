@@ -72,6 +72,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/dealers', require('./routes/dealers'));  // Dealer management
 app.use('/api', require('./routes/deals'));  // This includes VIN decode and dealer search
 app.use('/api/back-office', require('./routes/backOffice'));  // Back office deal tracking
+app.use('/api/sales', require('./routes/salesTracker'));  // Sales deal tracking
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
