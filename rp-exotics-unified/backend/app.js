@@ -460,12 +460,7 @@ app.post('/api/deals/vin/decode', async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK',
-    message: 'RP Exotics API is running!', 
-    timestamp: new Date().toISOString(),
-    database: db ? 'Connected' : 'Disconnected'
-  });
+  res.json({ status: 'OK' });
 });
 
 // =================== USER AUTHENTICATION ENDPOINTS ===================
