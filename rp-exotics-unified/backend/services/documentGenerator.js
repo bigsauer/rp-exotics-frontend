@@ -2,6 +2,16 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs-extra');
 const path = require('path');
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5000',
+  'https://rp-exotics-frontend.vercel.app',
+  'https://rp-exotics-frontend.railway.app',
+  'https://my-app.up.railway.app',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 class DocumentGenerator {
   constructor() {
     // Debug: Log the current working directory and __dirname
@@ -377,292 +387,7 @@ class DocumentGenerator {
     });
   }
 
-  async generateWholesaleBOS(dealData, user) {
-    // PATCH: Always trust dealData.sellerType and dealData.buyerType if present
-    if (dealData.sellerType) {
-      if (dealData.seller) dealData.seller.type = dealData.sellerType;
-      if (dealData.sellerInfo) dealData.sellerInfo.type = dealData.sellerType;
-      console.log('[PDF GEN][PATCH] seller.type forcibly set from dealData.sellerType:', dealData.sellerType);
-    }
-    if (dealData.buyerType) {
-      if (dealData.buyer) dealData.buyer.type = dealData.buyerType;
-      if (dealData.buyerInfo) dealData.buyerInfo.type = dealData.buyerType;
-      console.log('[PDF GEN][PATCH] buyer.type forcibly set from dealData.buyerType:', dealData.buyerType);
-    }
-    // ... existing code ...
-    const puppeteer = require('puppeteer');
-    const path = require('path');
-    const fs = require('fs-extra');
-    const safeStockNumber = (dealData.stockNumber && dealData.stockNumber !== 'N/A') ? dealData.stockNumber : (dealData.rpStockNumber && dealData.rpStockNumber !== 'N/A' ? dealData.rpStockNumber : 'UNKNOWN');
-    const docNumber = Date.now();
-    const fileName = `wholesale_purchase_order_${safeStockNumber}_${docNumber}.pdf`;
-    const filePath = path.join(__dirname, '../uploads/documents', fileName);
-    // --- Initialize buyer and buyerContact before any use ---
-    let buyer = dealData.buyer || {};
-    let buyerContact = buyer.contact || {};
-    
-    // For wholesale D2D buy deals: RP Exotics is the buyer (purchasing dealer)
-    // For other wholesale D2D deals: the seller becomes the buyer (purchasing dealer)
-    if (dealData.dealType === 'wholesale-d2d' && dealData.dealType2SubType === 'buy') {
-      // For wholesale D2D buy: RP Exotics is the buyer (purchasing dealer)
-      buyer = {
-        name: 'RP Exotics',
-        type: 'dealer',
-        licenseNumber: 'D4865',
-        tier: 'Tier 1',
-        contact: {
-          address: {
-            street: '1155 N Warson Rd',
-            city: 'Saint Louis',
-            state: 'MO',
-            zip: '63132'
-          },
-          phone: '(314) 970-2427',
-          email: 'titling@rpexotics.com'
-        }
-      };
-      buyerContact = buyer.contact || {};
-      console.log('[PDF GEN] [BOS DEBUG] Wholesale D2D Buy: RP Exotics set as purchasing dealer');
-    } else if (dealData.dealType === 'wholesale-d2d') {
-      // For other wholesale D2D deals: seller becomes the buyer (purchasing dealer)
-      buyer = dealData.seller || {};
-      buyerContact = buyer.contact || {};
-      console.log('[PDF GEN] [BOS DEBUG] Wholesale D2D: Seller set as purchasing dealer');
-    }
-    
-    // --- Now safe to use buyer and buyerContact ---
-    console.log('[PDF GEN] [BOS DEBUG] buyer:', JSON.stringify(buyer, null, 2));
-    console.log('[PDF GEN] [BOS DEBUG] buyerContact:', JSON.stringify(buyerContact, null, 2));
-    // ... existing code ...
-    // Robust fallback for all fields
-    const purchasingDealer = {
-      name: buyer.name || buyerContact.name || '',
-      address: (buyerContact.address && Object.values(buyerContact.address).filter(Boolean).join(', ')) || buyer.address || '',
-      phone: buyerContact.phone || buyer.phone || '',
-      email: buyerContact.email || buyer.email || '',
-      licenseNumber: buyer.licenseNumber || buyerContact.licenseNumber || ''
-    };
-    console.log('[PDF GEN] [BOS DEBUG] Purchasing dealer fields:', purchasingDealer);
-    console.log('[PDF GEN] [BOS DEBUG] Purchasing dealer licenseNumber sources:', {
-      direct: buyer.licenseNumber,
-      contact: buyerContact.licenseNumber
-    });
-    // Extract vehicle info
-    const vehicle = dealData;
-    // Extract payment terms
-    const paymentTerms = dealData.paymentTerms || 'Pay upon release.';
-    // Sale price
-    const salePrice = dealData.wholesalePrice || dealData.purchasePrice || (dealData.financial && (dealData.financial.wholesalePrice || dealData.financial.purchasePrice)) || 'N/A';
-    // Date
-    const today = new Date();
-    const dateString = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    // Address formatting
-    function formatAddress(addr) {
-      if (!addr) return '';
-      if (typeof addr === 'string') return addr;
-      if (typeof addr === 'object') {
-        return [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ').replace(/, ,/g, ',').replace(/, $/, '');
-      }
-      return String(addr);
-    }
-    // HTML template with dynamic fields
-    const html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Wholesale Sales Order</title>
-      <style>
-        @media print {
-          body { margin: 0; padding: 0; }
-          .no-print { display: none; }
-        }
-        body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.3; margin: 0; padding: 20px; background: white; }
-        .container { max-width: 8.5in; margin: 0 auto; background: white; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        .header h1 { margin: 0; font-size: 20px; font-weight: bold; }
-        .header h2 { margin: 5px 0 0 0; font-size: 14px; color: #666; }
-        .order-info { display: flex; justify-content: space-between; margin-bottom: 15px; background: #f8f8f8; padding: 8px; border: 1px solid #ccc; }
-        .section { margin-bottom: 15px; border: 1px solid #333; padding: 8px; }
-        .section-header { background: #333; color: white; padding: 4px 8px; margin: -8px -8px 8px -8px; font-weight: bold; font-size: 12px; }
-        .two-column { display: flex; gap: 15px; }
-        .column { flex: 1; }
-        .field-row { display: flex; margin-bottom: 6px; align-items: center; }
-        .field-label { font-weight: bold; min-width: 80px; margin-right: 10px; }
-        .field-value { border-bottom: 1px solid #333; flex: 1; min-height: 16px; padding: 2px 4px; }
-        .terms { font-size: 10px; line-height: 1.4; }
-        .terms ul { margin: 5px 0; padding-left: 15px; }
-        .signatures { margin-top: 20px; }
-        .signature-row { display: flex; gap: 30px; margin-top: 15px; }
-        .signature-block { flex: 1; }
-        .signature-line { border-bottom: 1px solid #333; margin-bottom: 5px; height: 20px; }
-        .wholesale-badge { position: absolute; top: 15px; right: 15px; background: #7c3aed; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 12px; }
-        .vehicle-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .financial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="wholesale-badge">WHOLESALE</div>
-        <div class="header">
-          <h1>WHOLESALE SALES ORDER</h1>
-          <h2>Dealer-to-Dealer Vehicle Transaction</h2>
-        </div>
-        <div class="order-info">
-          <div><strong>Sales Order Date:</strong> ${dateString}</div>
-        </div>
-        <div class="section">
-          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>PURCHASING DEALER</span>
-            <span style="font-size: 11px; background: white; color: black; padding: 2px 8px; border-radius: 3px;">License #: ${purchasingDealer.licenseNumber}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Dealer Name:</span>
-            <span class="field-value">${purchasingDealer.name}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Email:</span>
-            <span class="field-value">${purchasingDealer.email}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Phone:</span>
-            <span class="field-value">${purchasingDealer.phone}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Address:</span>
-            <span class="field-value">${purchasingDealer.address}</span>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-header">SELLING DEALER (RP EXOTICS)</div>
-          <div class="two-column">
-            <div class="column">
-              <div class="field-row">
-                <span class="field-label">Company:</span>
-                <span class="field-value">RP Exotics</span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">Address:</span>
-                <span class="field-value">1155 N Warson Rd, Saint Louis, MO 63132</span>
-              </div>
-            </div>
-            <div class="column">
-              <div class="field-row">
-                <span class="field-label">License #:</span>
-                <span class="field-value">D4865</span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">Phone:</span>
-                <span class="field-value">(314) 970-2427</span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">Email:</span>
-                <span class="field-value">titling@rpexotics.com</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-header">VEHICLE INFORMATION</div>
-          <div class="vehicle-grid">
-            <div class="field-row">
-              <span class="field-label">VIN:</span>
-              <span class="field-value">${vehicle.vin || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Year:</span>
-              <span class="field-value">${vehicle.year || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Stock #:</span>
-              <span class="field-value">${vehicle.stockNumber || vehicle.rpStockNumber || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Make:</span>
-              <span class="field-value">${vehicle.make || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Model:</span>
-              <span class="field-value">${vehicle.model || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Mileage:</span>
-              <span class="field-value">${vehicle.mileage !== undefined ? vehicle.mileage.toLocaleString() : ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Exterior:</span>
-              <span class="field-value">${vehicle.exteriorColor || vehicle.color || ''}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">Interior:</span>
-              <span class="field-value">${vehicle.interiorColor || ''}</span>
-            </div>
-            <div></div>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-header">FINANCIAL INFORMATION</div>
-          <div class="field-row">
-            <span class="field-label">Sale Price:</span>
-            <span class="field-value">$${salePrice ? salePrice.toLocaleString() : 'N/A'}</span>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-header">WHOLESALE TRANSACTION TERMS & CONDITIONS</div>
-          <div class="terms">
-            <ul>
-              <li>This is a DEALER-TO-DEALER wholesale transaction. Purchasing dealer acknowledges this is a business-to-business sale.</li>
-              <li>Vehicle is sold AS-IS, WHERE-IS with no warranties expressed or implied unless specifically noted.</li>
-              <li>Payment terms: ${paymentTerms}</li>
-              <li>Title will be clear and transferable. Any liens will be properly disclosed and handled.</li>
-              <li>Any disputes shall be resolved through arbitration in St. Louis County, Missouri.</li>
-              <li>This agreement constitutes the entire understanding between the parties.</li>
-            </ul>
-          </div>
-        </div>
-        <div class="signatures">
-          <div class="section-header" style="background: #333; color: white; padding: 4px 8px; margin-bottom: 15px;">SIGNATURES</div>
-          <div class="signature-row">
-            <div class="signature-block">
-              <div><strong>RP Exotics Representative (Seller):</strong></div>
-              <div class="signature-line"></div>
-              <div style="font-size: 10px;">Signature</div>
-              <div style="margin-top: 10px;">Print Name: ________________</div>
-              <div style="margin-top: 10px;">Date: ________________</div>
-            </div>
-            <div class="signature-block">
-              <div><strong>Purchasing Dealer Representative:</strong></div>
-              <div class="signature-line"></div>
-              <div style="font-size: 10px;">Signature</div>
-              <div style="margin-top: 10px;">Print Name: ________________</div>
-              <div style="margin-top: 10px;">Date: ________________</div>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ccc; padding-top: 10px;">
-          RP Exotics Wholesale Division | Professional Vehicle Sales & Distribution<br>
-          This document represents a binding wholesale sales agreement between licensed dealers.
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
-    // Use Puppeteer to render HTML to PDF
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--font-render-hinting=none'] });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.pdf({ path: filePath, format: 'A4', printBackground: true });
-    await browser.close();
-    // Return file info
-    const stats = fs.statSync(filePath);
-    return {
-      fileName,
-      filePath,
-      fileSize: stats.size,
-      documentNumber: `WBOS-${safeStockNumber}-${Date.now().toString(36).toUpperCase()}`
-    };
-  }
+  // REMOVED: Duplicate generateWholesaleBOS function - using the complete one at line 2179
 
   async generateWholesaleFlipVehicleRecord(dealData, user) {
     console.log('[PDF GEN] === generateWholesaleFlipVehicleRecord called ===');
@@ -682,17 +407,27 @@ class DocumentGenerator {
   }
 
   async generateStandardVehicleRecord(dealData, user) {
-    // --- DEBUG: Log all deal type fields and price/label logic ---
-    console.log('[PDF GEN] [DEBUG] dealType:', dealData.dealType);
-    console.log('[PDF GEN] [DEBUG] dealType2:', dealData.dealType2);
-    console.log('[PDF GEN] [DEBUG] dealType2SubType:', dealData.dealType2SubType);
-    console.log('[PDF GEN] [DEBUG] Raw seller:', JSON.stringify(dealData.seller, null, 2));
-    console.log('[PDF GEN] [DEBUG] Raw buyer:', JSON.stringify(dealData.buyer, null, 2));
-    console.log('[PDF GEN] dealData:', dealData);
-    console.log('[PDF GEN] user:', user);
-    console.log(`[PDF GEN] [DEBUG] dealType: ${dealData.dealType}, dealType2SubType: ${dealData.dealType2SubType}`);
-    console.log('[PDF GEN] [DEBUG] Raw seller:', JSON.stringify(dealData.seller, null, 2));
-    console.log('[PDF GEN] [DEBUG] Raw buyer:', JSON.stringify(dealData.buyer, null, 2));
+    console.log('[PDF GEN][StandardVehicleRecord] Starting standard vehicle record generation');
+    console.log('[PDF GEN][StandardVehicleRecord] Deal data:', {
+      dealType: dealData.dealType,
+      dealType2: dealData.dealType2,
+      dealType2SubType: dealData.dealType2SubType,
+      stockNumber: dealData.stockNumber,
+      vin: dealData.vin
+    });
+    
+    try {
+      // --- DEBUG: Log all deal type fields and price/label logic ---
+      console.log('[PDF GEN] [DEBUG] dealType:', dealData.dealType);
+      console.log('[PDF GEN] [DEBUG] dealType2:', dealData.dealType2);
+      console.log('[PDF GEN] [DEBUG] dealType2SubType:', dealData.dealType2SubType);
+      console.log('[PDF GEN] [DEBUG] Raw seller:', JSON.stringify(dealData.seller, null, 2));
+      console.log('[PDF GEN] [DEBUG] Raw buyer:', JSON.stringify(dealData.buyer, null, 2));
+      console.log('[PDF GEN] dealData:', dealData);
+      console.log('[PDF GEN] user:', user);
+      console.log(`[PDF GEN] [DEBUG] dealType: ${dealData.dealType}, dealType2SubType: ${dealData.dealType2SubType}`);
+      console.log('[PDF GEN] [DEBUG] Raw seller:', JSON.stringify(dealData.seller, null, 2));
+      console.log('[PDF GEN] [DEBUG] Raw buyer:', JSON.stringify(dealData.buyer, null, 2));
 
     // Helper for RP Exotics info
     const rpExoticsInfo = {
@@ -809,6 +544,66 @@ class DocumentGenerator {
       console.log('[PDF GEN] [DEBUG] Wholesale D2D Buy mapping applied:');
       console.log('[PDF GEN] [DEBUG] - Seller (selling dealer):', mappedSeller.name);
       console.log('[PDF GEN] [DEBUG] - Buyer (RP Exotics):', mappedBuyer.name);
+    } else if (dealData.dealType === 'wholesale-flip') {
+      // For wholesale flip deals, handle buyer data properly
+      console.log('[PDF GEN] [DEBUG] Wholesale Flip deal detected in vehicle record generation');
+      console.log('[PDF GEN] [DEBUG] Original buyer data:', JSON.stringify(buyer, null, 2));
+      
+      // If buyer data is incomplete, try to get buyer info from buyerFromDB
+      // Only fallback if buyer has no name or if contact is completely missing
+      const hasValidBuyerName = buyer.name && buyer.name !== 'N/A' && buyer.name.trim() !== '';
+      const hasValidContact = buyer.contact && typeof buyer.contact === 'object';
+      
+      if (!hasValidBuyerName || !hasValidContact) {
+        console.log('[PDF GEN] [DEBUG] Incomplete buyer data detected, checking for buyerFromDB...');
+        console.log('[PDF GEN] [DEBUG] Buyer name valid:', hasValidBuyerName, 'Buyer contact valid:', hasValidContact);
+        console.log('[PDF GEN] [DEBUG] Original buyer data:', JSON.stringify(buyer, null, 2));
+        
+        // Try to get buyer info from buyerFromDB if available
+        if (dealData.buyerFromDB && dealData.buyerFromDB.name) {
+          console.log('[PDF GEN] [DEBUG] Using buyerFromDB data:', dealData.buyerFromDB.name);
+          mappedBuyer = {
+            name: dealData.buyerFromDB.name,
+            email: dealData.buyerFromDB.email || 'N/A',
+            phone: dealData.buyerFromDB.phone || 'N/A',
+            address: dealData.buyerFromDB.address ? 
+              (typeof dealData.buyerFromDB.address === 'string' ? 
+                dealData.buyerFromDB.address : 
+                `${dealData.buyerFromDB.address.street || ''}, ${dealData.buyerFromDB.address.city || ''}, ${dealData.buyerFromDB.address.state || ''} ${dealData.buyerFromDB.address.zip || ''}`.trim().replace(/^,\s*/, '').replace(/,\s*$/, '')
+              ) : 'N/A',
+            licenseNumber: dealData.buyerFromDB.licenseNumber || 'N/A',
+            tier: dealData.buyerFromDB.tier || 'Tier 1',
+            type: dealData.buyerFromDB.type || 'dealer'
+          };
+        } else {
+          console.log('[PDF GEN] [DEBUG] No buyerFromDB available, using RP Exotics as purchasing dealer');
+          mappedBuyer = {
+            name: 'RP Exotics',
+            email: 'titling@rpexotics.com',
+            phone: '(314) 970-2427',
+            address: '1155 N Warson Rd, Saint Louis, MO 63132',
+            licenseNumber: 'D4865',
+            tier: 'Tier 1',
+            type: 'dealer'
+          };
+        }
+      } else {
+        // Use the buyer data as is
+        console.log('[PDF GEN] [DEBUG] Using actual buyer data for wholesale-flip vehicle record:', buyer.name);
+        mappedBuyer = buyer;
+      }
+      
+      console.log('[PDF GEN] [DEBUG] Wholesale Flip mapping applied:');
+      console.log('[PDF GEN] [DEBUG] - Seller:', mappedSeller.name);
+      console.log('[PDF GEN] [DEBUG] - Buyer (purchasing dealer):', mappedBuyer.name);
+      console.log('[PDF GEN] [DEBUG] Final mappedBuyer for vehicle record:', {
+        name: mappedBuyer.name,
+        email: mappedBuyer.email,
+        phone: mappedBuyer.phone,
+        address: mappedBuyer.address,
+        licenseNumber: mappedBuyer.licenseNumber,
+        type: mappedBuyer.type
+      });
     }
     // Declare sellerInfo and buyerInfo as let so they can be reassigned if needed
     let sellerInfo = {
@@ -1296,7 +1091,7 @@ class DocumentGenerator {
                         <div class="field-group" style="margin-bottom: 15px;">
                             <span class="field-label">BROKER FEE:</span>
                             <span class="field-value">${financialInfo.brokerFee}</span>
-                    </div>
+                        </div>
                         <div class="field-group" style="margin-bottom: 15px;">
                             <span class="field-label">AMOUNT DUE TO RP:</span>
                             <span class="field-value">${financialInfo.amountDueToRP}</span>
@@ -1356,6 +1151,11 @@ class DocumentGenerator {
       fileSize: stats.size,
       documentNumber: docNumber
     };
+    } catch (error) {
+      console.error('[PDF GEN][StandardVehicleRecord] Error generating standard vehicle record:', error);
+      console.error('[PDF GEN][StandardVehicleRecord] Error stack:', error.stack);
+      throw error;
+    }
   }
 
   async generateWholesalePurchaseOrder(dealData, user) {
@@ -2185,13 +1985,14 @@ class DocumentGenerator {
     const safeStockNumber = (dealData.stockNumber && dealData.stockNumber !== 'N/A') ? dealData.stockNumber : (dealData.rpStockNumber && dealData.rpStockNumber !== 'N/A' ? dealData.rpStockNumber : 'UNKNOWN');
     const docNumber = Date.now();
     const fileName = `wholesale_purchase_order_${safeStockNumber}_${docNumber}.pdf`;
-    const filePath = path.join(__dirname, '../uploads/documents', fileName);
+    const filePath = path.join(this.uploadsDir, fileName);
     // --- Initialize buyer and buyerContact before any use ---
     let buyer = dealData.buyer || {};
     let buyerContact = buyer.contact || {};
+
+    console.log('[PDF GEN][DEBUG] Incoming dealData.buyer:', JSON.stringify(dealData.buyer, null, 2));
+    console.log('[PDF GEN][DEBUG] Incoming dealData.seller:', JSON.stringify(dealData.seller, null, 2));
     
-    // For wholesale D2D buy deals: RP Exotics is the buyer (purchasing dealer)
-    // For other wholesale D2D deals: the seller becomes the buyer (purchasing dealer)
     if (dealData.dealType === 'wholesale-d2d' && dealData.dealType2SubType === 'buy') {
       // For wholesale D2D buy: RP Exotics is the buyer (purchasing dealer)
       buyer = {
@@ -2212,21 +2013,90 @@ class DocumentGenerator {
       };
       buyerContact = buyer.contact || {};
       console.log('[PDF GEN] [BOS DEBUG] Wholesale D2D Buy: RP Exotics set as purchasing dealer');
+    } else if (dealData.dealType === 'wholesale-d2d' && dealData.dealType2SubType === 'sale') {
+      // For wholesale D2D sale: use the buyer as purchasing dealer
+      buyer = dealData.buyer || {};
+      buyerContact = buyer.contact || {};
+      console.log('[PDF GEN] [BOS DEBUG] Wholesale D2D Sale: Buyer set as purchasing dealer');
     } else if (dealData.dealType === 'wholesale-d2d') {
       // For other wholesale D2D deals: seller becomes the buyer (purchasing dealer)
       buyer = dealData.seller || {};
       buyerContact = buyer.contact || {};
       console.log('[PDF GEN] [BOS DEBUG] Wholesale D2D: Seller set as purchasing dealer');
+    } else {
+      // For all other deal types (including wholesale-flip): use the buyer as purchasing dealer
+      buyer = dealData.buyer || {};
+      buyerContact = buyer.contact || {};
+      
+      // Handle incomplete buyer data for wholesale-flip deals
+      // Only fallback if buyer has no name or if contact is completely missing
+      const hasValidBuyerName = buyer.name && buyer.name !== 'N/A' && buyer.name.trim() !== '';
+      const hasValidContact = buyer.contact && typeof buyer.contact === 'object';
+      
+      if (dealData.dealType === 'wholesale-flip' && (!hasValidBuyerName || !hasValidContact)) {
+        console.log('[PDF GEN] [BOS DEBUG] Incomplete buyer data detected, checking for buyerFromDB...');
+        console.log('[PDF GEN] [BOS DEBUG] Buyer name valid:', hasValidBuyerName, 'Buyer contact valid:', hasValidContact);
+        console.log('[PDF GEN] [BOS DEBUG] Original buyer data:', JSON.stringify(buyer, null, 2));
+        
+        // Try to get buyer info from buyerFromDB if available
+        if (dealData.buyerFromDB && dealData.buyerFromDB.name) {
+          console.log('[PDF GEN] [BOS DEBUG] Using buyerFromDB data:', dealData.buyerFromDB.name);
+          buyer = {
+            name: dealData.buyerFromDB.name,
+            type: dealData.buyerFromDB.type || 'dealer',
+            licenseNumber: dealData.buyerFromDB.licenseNumber || 'N/A',
+            tier: dealData.buyerFromDB.tier || 'Tier 1',
+            contact: {
+              address: dealData.buyerFromDB.address || {},
+              phone: dealData.buyerFromDB.phone || 'N/A',
+              email: dealData.buyerFromDB.email || 'N/A'
+            }
+          };
+        } else {
+          console.log('[PDF GEN] [BOS DEBUG] No buyerFromDB available, using default RP Exotics as purchasing dealer');
+          buyer = {
+            name: 'RP Exotics',
+            type: 'dealer',
+            licenseNumber: 'D4865',
+            tier: 'Tier 1',
+            contact: {
+              address: {
+                street: '1155 N Warson Rd',
+                city: 'Saint Louis',
+                state: 'MO',
+                zip: '63132'
+              },
+              phone: '(314) 970-2427',
+              email: 'titling@rpexotics.com'
+            }
+          };
+        }
+        buyerContact = buyer.contact || {};
+      } else {
+        console.log('[PDF GEN] [BOS DEBUG] Using actual buyer data for wholesale-flip:', buyer.name);
+      }
+      
+      console.log('[PDF GEN] [BOS DEBUG] Default: Buyer set as purchasing dealer');
     }
+
+    console.log('[PDF GEN][DEBUG] Final buyer used for purchasingDealer:', JSON.stringify(buyer, null, 2));
+    console.log('[PDF GEN][DEBUG] Final buyerContact used for purchasingDealer:', JSON.stringify(buyerContact, null, 2));
     
     // --- Now safe to use buyer and buyerContact ---
     console.log('[PDF GEN] [BOS DEBUG] buyer:', JSON.stringify(buyer, null, 2));
     console.log('[PDF GEN] [BOS DEBUG] buyerContact:', JSON.stringify(buyerContact, null, 2));
     // ... existing code ...
     // Robust fallback for all fields
+    let address = '';
+    if (buyerContact.address && typeof buyerContact.address === 'object') {
+      address = [buyerContact.address.street, buyerContact.address.city, buyerContact.address.state, buyerContact.address.zip].filter(Boolean).join(', ');
+    } else {
+      address = buyerContact.address || buyer.address || '';
+    }
+    
     const purchasingDealer = {
       name: buyer.name || buyerContact.name || '',
-      address: (buyerContact.address && Object.values(buyerContact.address).filter(Boolean).join(', ')) || buyer.address || '',
+      address: address,
       phone: buyerContact.phone || buyer.phone || '',
       email: buyerContact.email || buyer.email || '',
       licenseNumber: buyer.licenseNumber || buyerContact.licenseNumber || ''
@@ -2235,6 +2105,13 @@ class DocumentGenerator {
     console.log('[PDF GEN] [BOS DEBUG] Purchasing dealer licenseNumber sources:', {
       direct: buyer.licenseNumber,
       contact: buyerContact.licenseNumber
+    });
+    console.log('[PDF GEN] [BOS DEBUG] Final purchasing dealer for template:', {
+      name: purchasingDealer.name,
+      email: purchasingDealer.email,
+      phone: purchasingDealer.phone,
+      address: purchasingDealer.address,
+      licenseNumber: purchasingDealer.licenseNumber
     });
     // Extract vehicle info
     const vehicle = dealData;
@@ -2478,21 +2355,9 @@ class DocumentGenerator {
     console.log('[PDF GEN] - dealType === "wholesale-flip" && dealType2SubType === "buy-sell":', dealData.dealType === 'wholesale-flip' && dealData.dealType2SubType === 'buy-sell');
     console.log('[PDF GEN] - dealType === "wholesale":', dealData.dealType === 'wholesale');
     
-    // Check buy/sell deal conditions - handle both "buy-sell" and "buy" values
-    const isBuySellDeal = dealData.dealType === 'wholesale-flip' && 
-      (dealData.dealType2SubType === 'buy-sell' || dealData.dealType2SubType === 'buy');
-    const sellerIsDealer = isBuySellDeal && dealData.seller && dealData.seller.type === 'dealer';
-    const buyerIsDealer = isBuySellDeal && dealData.buyer && dealData.buyer.type === 'dealer';
-    
-    console.log('[PDF GEN] Buy/Sell conditions:');
-    console.log('[PDF GEN] - isBuySellDeal:', isBuySellDeal);
-    console.log('[PDF GEN] - sellerIsDealer:', sellerIsDealer);
-    console.log('[PDF GEN] - buyerIsDealer:', buyerIsDealer);
     console.log('[PDF GEN] - dealData.seller:', dealData.seller);
     console.log('[PDF GEN] - dealData.buyer:', dealData.buyer);
     console.log('[PDF GEN] - dealData.sellerInfo:', dealData.sellerInfo);
-    console.log('[PDF GEN] - isBuyerDocument:', dealData.isBuyerDocument);
-    console.log('[PDF GEN] - isSellerDocument:', dealData.isSellerDocument);
     
     try {
       let documentResult;
@@ -2569,68 +2434,53 @@ class DocumentGenerator {
         };
       }
       
-      // Handle wholesale flip buy/sell deals with separate buyer/seller documents
-      if (dealData.isBuyerDocument) {
-        console.log('[PDF GEN] 🎯 Generating buyer document for wholesale flip deal');
-        console.log('[PDF GEN] 🔍 Buyer type check:', { buyerType: dealData.buyer?.type });
-        if (dealData.dealType === 'wholesale-flip') {
-          if (dealData.buyer?.type === 'dealer') {
-            // Use the same BOS as standard wholesale D2D sale
-            console.log('[PDF GEN] -> Using generateWholesaleBOS for wholesale flip buyer (dealer)...');
-            documentResult = await this.generateWholesaleBOS(dealData, user);
-            console.log('[PDF GEN] <- generateWholesaleBOS complete:', documentResult.filePath);
-            console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_bos for wholesale flip buyer (dealer)');
-            return {
-              ...documentResult,
-              documentType: 'wholesale_bos'
-            };
-          } else {
-            console.log('[PDF GEN] -> Using generateRetailPPBuy for wholesale flip buyer (private)...');
-            documentResult = await this.generateRetailPPBuy(dealData, user);
-            console.log('[PDF GEN] <- generateRetailPPBuy complete:', documentResult.filePath);
-            console.log('[PDF GEN][DEBUG] Returning documentType: retail_pp_buy for wholesale flip buyer (private)');
-            return {
-              ...documentResult,
-              documentType: 'retail_pp_buy'
-            };
-          }
+          // Handle wholesale flip deals based on seller type
+      if (dealData.dealType === 'wholesale-flip') {
+        console.log('[PDF GEN] 🎯 Generating document for wholesale flip deal');
+        console.log('[PDF GEN] 🔍 Seller type:', dealData.seller?.type);
+        console.log('[PDF GEN] 🔍 Buyer type:', dealData.buyer?.type);
+        console.log('[PDF GEN] 🔍 sellerType from data:', dealData.sellerType);
+        console.log('[PDF GEN] 🔍 buyerType from data:', dealData.buyerType);
+        
+        // Determine the actual types to use
+        const sellerType = dealData.sellerType || dealData.seller?.type || 'private';
+        const buyerType = dealData.buyerType || dealData.buyer?.type || 'private';
+        
+        console.log('[PDF GEN] 🔍 Final seller type:', sellerType);
+        console.log('[PDF GEN] 🔍 Final buyer type:', buyerType);
+        
+        // For wholesale flip deals, generate documents based on the party types
+        if (sellerType === 'dealer') {
+          // Seller is dealer - generate wholesale purchase agreement
+          console.log('[PDF GEN] -> Using generateWholesalePPBuy for dealer seller...');
+          documentResult = await this.generateWholesalePPBuy(dealData, user);
+          console.log('[PDF GEN] <- generateWholesalePPBuy complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_purchase_agreement for dealer seller');
+          return {
+            ...documentResult,
+            documentType: 'wholesale_purchase_agreement'
+          };
+        } else if (buyerType === 'dealer') {
+          // Buyer is dealer - generate wholesale BOS
+          console.log('[PDF GEN] -> Using generateWholesaleBOS for dealer buyer...');
+          documentResult = await this.generateWholesaleBOS(dealData, user);
+          console.log('[PDF GEN] <- generateWholesaleBOS complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_bos for dealer buyer');
+          return {
+            ...documentResult,
+            documentType: 'wholesale_bos'
+          };
+        } else {
+          // Both parties are private - generate retail private party purchase agreement
+          console.log('[PDF GEN] -> Using generateRetailPPBuy for private parties...');
+          documentResult = await this.generateRetailPPBuy(dealData, user);
+          console.log('[PDF GEN] <- generateRetailPPBuy complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: retail_pp_buy for private parties');
+          return {
+            ...documentResult,
+            documentType: 'retail_pp_buy'
+          };
         }
-        // ... fallback (should not be hit)
-        documentResult = await this.generateRetailPPBuy(dealData, user);
-        return {
-          ...documentResult,
-          documentType: 'retail_pp_buy'
-        };
-      } else if (dealData.isSellerDocument) {
-        console.log('[PDF GEN] 🎯 Generating seller document for wholesale flip deal');
-        console.log('[PDF GEN] 🔍 Seller type check:', { sellerType: dealData.seller?.type });
-        if (dealData.dealType === 'wholesale-flip') {
-          if (dealData.seller?.type === 'dealer') {
-            console.log('[PDF GEN] -> Using generateWholesalePPBuy for wholesale flip seller (dealer)...');
-            documentResult = await this.generateWholesalePPBuy(dealData, user);
-            console.log('[PDF GEN] <- generateWholesalePPBuy complete:', documentResult.filePath);
-            console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_purchase_agreement for wholesale flip seller (dealer)');
-            return {
-              ...documentResult,
-              documentType: 'wholesale_purchase_agreement'
-            };
-          } else {
-            console.log('[PDF GEN] -> Using generateRetailPPBuy for wholesale flip seller (private)...');
-            documentResult = await this.generateRetailPPBuy(dealData, user);
-            console.log('[PDF GEN] <- generateRetailPPBuy complete:', documentResult.filePath);
-            console.log('[PDF GEN][DEBUG] Returning documentType: retail_pp_buy for wholesale flip seller (private)');
-            return {
-              ...documentResult,
-              documentType: 'retail_pp_buy'
-            };
-          }
-        }
-        // ... fallback (should not be hit)
-        documentResult = await this.generateRetailPPBuy(dealData, user);
-        return {
-          ...documentResult,
-          documentType: 'retail_pp_buy'
-        };
       } else if (dealData.dealType === 'retail' || dealData.dealType === 'retail-pp') {
         console.log('[PDF GEN] -> Calling generateRetailPPBuy...');
         documentResult = await this.generateRetailPPBuy(dealData, user);
@@ -2640,44 +2490,48 @@ class DocumentGenerator {
           ...documentResult,
           documentType: 'retail_pp_buy'
         };
-      } else if (isBuySellDeal && sellerIsDealer) {
-        // Buy/Sell deal with dealer seller - generate wholesale purchase contract
-        console.log('[PDF GEN] -> Calling generateWholesalePPBuy for buy/sell with dealer seller...');
-        documentResult = await this.generateWholesalePPBuy(dealData, user);
-        console.log('[PDF GEN] <- generateWholesalePPBuy complete:', documentResult.filePath);
-        console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_purchase_agreement for buy/sell with dealer seller');
-        return {
-          ...documentResult,
-          documentType: 'wholesale_purchase_agreement'
-        };
-      } else if (isBuySellDeal && buyerIsDealer) {
-        // Buy/Sell deal with dealer buyer - generate wholesale BOS
-        console.log('[PDF GEN] -> Calling generateWholesaleBOS for buy/sell with dealer buyer...');
-        documentResult = await this.generateWholesaleBOS(dealData, user);
-        console.log('[PDF GEN] <- generateWholesaleBOS complete:', documentResult.filePath);
-        console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_bos for buy/sell with dealer buyer');
-        return {
-          ...documentResult,
-          documentType: 'wholesale_bos'
-        };
-      } else if (dealData.dealType === 'wholesale') {
-        console.log('[PDF GEN] -> Calling generateBillOfSale (compact style for wholesale)...');
-        documentResult = await this.generateBillOfSale(dealData, user);
-        console.log('[PDF GEN] <- generateBillOfSale complete:', documentResult.filePath);
-        console.log('[PDF GEN][DEBUG] Returning documentType: bill_of_sale for wholesale deal');
-        return {
-          ...documentResult,
-          documentType: 'bill_of_sale'
-        };
+
+              } else if (dealData.dealType === 'wholesale') {
+          console.log('[PDF GEN] -> Calling generateBillOfSale (compact style for wholesale)...');
+          documentResult = await this.generateBillOfSale(dealData, user);
+          console.log('[PDF GEN] <- generateBillOfSale complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: bill_of_sale for wholesale deal');
+          return {
+            ...documentResult,
+            documentType: 'bill_of_sale'
+          };
+        } else if (dealData.dealType === 'wholesale-pp') {
+          console.log('[PDF GEN] -> Calling generateWholesalePPBuy for wholesale-pp...');
+          documentResult = await this.generateWholesalePPBuy(dealData, user);
+          console.log('[PDF GEN] <- generateWholesalePPBuy complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: wholesale_purchase_agreement for wholesale-pp deal');
+          return {
+            ...documentResult,
+            documentType: 'wholesale_purchase_agreement'
+          };
+        } else if (dealData.dealType === 'consignment') {
+          console.log('[PDF GEN] -> Calling generateRetailPPBuy for consignment...');
+          documentResult = await this.generateRetailPPBuy(dealData, user);
+          console.log('[PDF GEN] <- generateRetailPPBuy complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: retail_pp_buy for consignment deal');
+          return {
+            ...documentResult,
+            documentType: 'retail_pp_buy'
+          };
+        } else if (dealData.dealType === 'auction') {
+          console.log('[PDF GEN] -> Calling generateRetailPPBuy for auction...');
+          documentResult = await this.generateRetailPPBuy(dealData, user);
+          console.log('[PDF GEN] <- generateRetailPPBuy complete:', documentResult.filePath);
+          console.log('[PDF GEN][DEBUG] Returning documentType: retail_pp_buy for auction deal');
+          return {
+            ...documentResult,
+            documentType: 'retail_pp_buy'
+          };
       } else {
-        console.log('[PDF GEN] -> Calling generateBillOfSale (default case)...');
-        documentResult = await this.generateBillOfSale(dealData, user);
-        console.log('[PDF GEN] <- generateBillOfSale complete:', documentResult.filePath);
-        console.log('[PDF GEN][DEBUG] Returning documentType: bill_of_sale for default case');
-        return {
-          ...documentResult,
-          documentType: 'bill_of_sale'
-        };
+        // No matching deal type found - this should not happen with proper deal types
+        console.error('[PDF GEN] ❌ No matching deal type found for:', dealData.dealType);
+        console.error('[PDF GEN] ❌ Available deal types: wholesale, wholesale-d2d, wholesale-pp, wholesale-flip, retail, retail-pp, consignment, auction');
+        throw new Error(`Unsupported deal type: ${dealData.dealType}`);
       }
     } catch (error) {
       console.error('[PDF GEN] ❌ Error in generateDocument:', error);
@@ -2697,7 +2551,7 @@ class DocumentGenerator {
     // Use VIN or recordId as fallback for file name
     const safeStockNumber = (dealData.stockNumber && dealData.stockNumber !== 'N/A') ? dealData.stockNumber : (dealData.rpStockNumber && dealData.rpStockNumber !== 'N/A') ? dealData.rpStockNumber : (dealData.vin || dealData.vehicleRecordId || 'UNKNOWN');
     const fileName = `vehicle_record_${safeStockNumber}_${Date.now()}.pdf`;
-    const filePath = path.resolve(__dirname, '../uploads/documents', fileName);
+    const filePath = path.join(this.uploadsDir, fileName);
     console.log('[PDF GEN][RetailPPVehicleRecord] Generating file:', fileName, 'at', filePath);
 
     // Helper for address formatting
@@ -3092,12 +2946,32 @@ class DocumentGenerator {
   }
 
   async generateVehicleRecordPDF(dealData, user) {
-    // Retail-pp buy: use custom template
-    if (dealData.dealType === 'retail-pp' && dealData.dealType2SubType === 'buy') {
-      return await this.generateRetailPPVehicleRecord(dealData, user);
+    console.log('[PDF GEN][VehicleRecordPDF] Starting vehicle record PDF generation');
+    console.log('[PDF GEN][VehicleRecordPDF] Deal data:', {
+      dealType: dealData.dealType,
+      dealType2SubType: dealData.dealType2SubType,
+      stockNumber: dealData.stockNumber,
+      vin: dealData.vin
+    });
+    
+    try {
+      // Retail-pp buy: use custom template
+      if (dealData.dealType === 'retail-pp' && dealData.dealType2SubType === 'buy') {
+        console.log('[PDF GEN][VehicleRecordPDF] Using retail PP vehicle record template');
+        const result = await this.generateRetailPPVehicleRecord(dealData, user);
+        console.log('[PDF GEN][VehicleRecordPDF] Retail PP vehicle record generated successfully:', result.fileName);
+        return result;
+      }
+      // Otherwise, use standard logic
+      console.log('[PDF GEN][VehicleRecordPDF] Using standard vehicle record template');
+      const result = await this.generateStandardVehicleRecord(dealData, user);
+      console.log('[PDF GEN][VehicleRecordPDF] Standard vehicle record generated successfully:', result.fileName);
+      return result;
+    } catch (error) {
+      console.error('[PDF GEN][VehicleRecordPDF] Error generating vehicle record PDF:', error);
+      console.error('[PDF GEN][VehicleRecordPDF] Error stack:', error.stack);
+      throw error;
     }
-    // Otherwise, use standard logic
-    return await this.generateStandardVehicleRecord(dealData, user);
   }
 }
 
